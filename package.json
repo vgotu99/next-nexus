@@ -1,0 +1,22 @@
+{
+  "name": "next-fetch",
+  "version": "1.0.0",
+  "description": "Axios-style HTTP client built on Fetch API for Next.js, with built-in server and client-side caching",
+  "main": "index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vgotu99/next-fetch.git"
+  },
+  "author": "vgotu99",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/vgotu99/next-fetch/issues"
+  },
+  "homepage": "https://github.com/vgotu99/next-fetch#readme",
+  "devDependencies": {
+    "@types/node": "^22.15.3"
+  }
+}
