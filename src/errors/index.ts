@@ -1,0 +1,1 @@
+export { NextFetchError } from "./NextFetchError";
