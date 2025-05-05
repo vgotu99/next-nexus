@@ -1,5 +1,8 @@
-import type { NextFetchRequestConfig } from "./request";
-import type { NextFetchResponse } from "./response";
+import type {
+  NextFetchRequestConfig,
+  NextFetchResponse,
+  NextFetchInterceptors,
+} from "../types";
 
 export interface NextFetchInstance {
   <T>(endpoint: string, config?: NextFetchRequestConfig): Promise<
@@ -28,6 +31,7 @@ export interface NextFetchInstance {
     endpoint: string,
     config?: NextFetchRequestConfig
   ): Promise<NextFetchResponse<T>>;
+  interceptors: NextFetchInterceptors;
 }
 
 export interface NextFetchStatic {
