@@ -1,3 +1,5 @@
+import { ErrorCode } from "./errorCodes";
+
 export class NextFetchError extends Error {
   response?: {
     data?: {
@@ -11,6 +13,7 @@ export class NextFetchError extends Error {
   };
   request?: Request;
   config?: RequestInit;
+  code?: ErrorCode;
 
   constructor(
     message: string,
@@ -23,6 +26,7 @@ export class NextFetchError extends Error {
         error?: string | undefined;
       };
       config?: RequestInit;
+      code?: ErrorCode;
     } = {}
   ) {
     super(message);
@@ -39,5 +43,6 @@ export class NextFetchError extends Error {
 
     this.request = options.request;
     this.config = options.config;
+    this.code = options.code;
   }
 }
