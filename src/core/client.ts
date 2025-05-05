@@ -4,16 +4,12 @@ import type {
   NextFetchInterceptorOptions,
   NextFetchRequestConfig,
 } from "../types";
-import { NextFetchError } from "../errors";
 import { createMethods } from "./methods";
 import {
   createRequestInterceptor,
   createResponseInterceptor,
 } from "./interceptor";
-import {
-  applyRequestInterceptors,
-  applyResponseInterceptors,
-} from "../utils";
+import { applyRequestInterceptors, applyResponseInterceptors } from "../utils";
 
 export const createNextFetchInstance = (
   defaultConfig: NextFetchRequestConfig = {}
@@ -64,15 +60,7 @@ export const createNextFetchInstance = (
 
       return modifiedResponse;
     } catch (error) {
-      if (error instanceof NextFetchError) throw error;
-
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new NextFetchError("Request timeout");
-      }
-
-      throw new NextFetchError(
-        error instanceof Error ? error.message : "Unknown error"
-      );
+      throw error;
     }
   };
 
