@@ -1,7 +1,19 @@
 import { executeRequest, setupHeaders, setupTimeout } from "../utils";
-import type { NextFetchInstance, NextFetchRequestConfig } from "../types";
+import type {
+  NextFetchInstance,
+  NextFetchInterceptorOptions,
+  NextFetchRequestConfig,
+} from "../types";
 import { NextFetchError } from "../errors";
 import { createMethods } from "./methods";
+import {
+  createRequestInterceptor,
+  createResponseInterceptor,
+} from "./interceptor";
+import {
+  applyRequestInterceptors,
+  applyResponseInterceptors,
+} from "../utils";
 
 export const createNextFetchInstance = (
   defaultConfig: NextFetchRequestConfig = {}
@@ -13,10 +25,14 @@ export const createNextFetchInstance = (
     ...restDefaultConfig
   } = defaultConfig;
 
+  const requestInterceptor = createRequestInterceptor();
+  const responseInterceptor = createResponseInterceptor();
+
   const nextFetch = async <T>(
     endpoint: string,
-    config: NextFetchRequestConfig = {}
+    config: NextFetchRequestConfig & NextFetchInterceptorOptions = {}
   ) => {
+    const { interceptors, ...restConfig } = config;
     const url = `${baseURL}${endpoint}`;
     const abortController = new AbortController();
     const timeout = config.timeout || defaultTimeout;
@@ -25,16 +41,28 @@ export const createNextFetchInstance = (
 
     const requestConfig: NextFetchRequestConfig = {
       ...restDefaultConfig,
-      ...config,
+      ...restConfig,
       headers,
       signal: abortController.signal,
     };
 
     try {
-      const request = new Request(url, requestConfig);
+      const requestInterceptors = requestInterceptor.getByNames(interceptors);
+      const modifiedConfig =
+        requestInterceptors.length > 0
+          ? await applyRequestInterceptors(requestConfig, requestInterceptors)
+          : requestConfig;
+
+      const request = new Request(url, modifiedConfig);
       const response = await executeRequest<T>(request, timeoutId);
 
-      return response;
+      const responseInterceptors = responseInterceptor.getByNames(interceptors);
+      const modifiedResponse =
+        responseInterceptors.length > 0
+          ? await applyResponseInterceptors<T>(response, responseInterceptors)
+          : response;
+
+      return modifiedResponse;
     } catch (error) {
       if (error instanceof NextFetchError) throw error;
 
@@ -48,5 +76,24 @@ export const createNextFetchInstance = (
     }
   };
 
-  return createMethods(nextFetch);
+  const instance = createMethods(nextFetch);
+
+  instance.interceptors = {
+    request: {
+      use: (name, onFulfilled, onRejected) =>
+        requestInterceptor.use(name, onFulfilled, onRejected),
+      remove: (name) => requestInterceptor.remove(name),
+      getAll: () => requestInterceptor.getAll(),
+      get: (name) => requestInterceptor.get(name),
+    },
+    response: {
+      use: (name, onFulfilled, onRejected) =>
+        responseInterceptor.use(name, onFulfilled, onRejected),
+      remove: (name) => responseInterceptor.remove(name),
+      getAll: () => responseInterceptor.getAll(),
+      get: (name) => responseInterceptor.get(name),
+    },
+  };
+
+  return instance;
 };
