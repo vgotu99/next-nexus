@@ -17,6 +17,12 @@
   },
   "homepage": "https://github.com/vgotu99/next-fetch#readme",
   "devDependencies": {
-    "@types/node": "^22.15.3"
+    "@types/node": "^22.15.3",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6"
+  },
+  "peerDependencies": {
+    "next": ">=13.4.0",
+    "react": ">=18.0.0"
   }
 }
