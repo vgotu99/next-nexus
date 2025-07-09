@@ -59,3 +59,10 @@ export interface SyncResult {
   shouldUpdateClientCache: boolean;
   newServerTimestamp?: string;
 }
+
+export interface ClientRevalidateResult {
+  success: boolean;
+  invalidatedCount: number;
+  tags: string[];
+  errors?: string[];
+}
