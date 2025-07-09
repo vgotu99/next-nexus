@@ -48,6 +48,7 @@ export class ClientCacheManager {
       tags?: string[];
       endpoint?: string;
       serverRevalidateInterval?: number;
+      serverCacheTimestamp?: string;
     } = {}
   ): Promise<void> {
     try {
@@ -58,6 +59,7 @@ export class ClientCacheManager {
         tags = [],
         endpoint = fullURL,
         serverRevalidateInterval,
+        serverCacheTimestamp,
       } = options;
 
       const cacheKey = this.getCacheKey(fullURL, method);
@@ -72,6 +74,7 @@ export class ClientCacheManager {
         fullURL,
         method: method.toUpperCase(),
         serverRevalidateInterval,
+        serverCacheTimestamp,
       };
 
       const dataResponse = new Response(JSON.stringify(data), {
@@ -173,7 +176,6 @@ export class ClientCacheManager {
               if (!fullEntry.isExpired()) {
                 entries.push(fullEntry);
               } else {
-                // 만료된 캐시 삭제
                 await this.delete(cacheEntry.fullURL, cacheEntry.method);
               }
             }
