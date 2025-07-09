@@ -94,7 +94,7 @@ export const executeRequest = async <T>(
       }
     }
 
-    return await processResponse<T>(response);
+    return await processResponse<T>(response, request.method);
   } catch (error) {
     if (timeoutId) clearTimeout(timeoutId);
 
