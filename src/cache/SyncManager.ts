@@ -24,12 +24,15 @@ export class SyncManager {
           method,
           responseData,
           serverMetadata,
-          clientCacheConfig
+          clientCacheConfig || this.extractClientConfigFromEntry(existingEntry)
         );
 
-        if (syncResult.wasServerCacheUpdated) {
+        if (
+          syncResult.wasServerCacheUpdated &&
+          process.env.NODE_ENV === "development"
+        ) {
           console.log(
-            `[SyncManager] Server cache updated, client cache synced: ${url}`
+            `[next-fetch] Server cache updated, client cache synchronized: ${url}`
           );
         }
 
@@ -38,7 +41,7 @@ export class SyncManager {
 
       return false;
     } catch (error) {
-      console.warn(`[SyncManager] Sync failed for ${url}:`, error);
+      console.warn(`[next-fetch] Sync failed for ${url}:`, error);
       return false;
     }
   }
@@ -76,16 +79,42 @@ export class SyncManager {
     return [...new Set([...serverTags, ...clientTags])];
   }
 
-  async invalidateByTags(tags: string[]): Promise<void> {
-    for (const tag of tags) {
-      await clientCacheManager.deleteByTag(tag);
+  async invalidateByTags(tags: string[]): Promise<number> {
+    if (typeof window === "undefined") {
+      console.warn("[next-fetch] Client cache invalidation skipped on server");
+      return 0;
     }
-    console.log(`[SyncManager] Invalidated cache by tags: ${tags.join(", ")}`);
+
+    let totalInvalidated = 0;
+
+    for (const tag of tags) {
+      const count = await clientCacheManager.deleteByTag(tag);
+      totalInvalidated += count;
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `[next-fetch] Invalidated ${totalInvalidated} cache entries by tags: ${tags.join(
+          ", "
+        )}`
+      );
+    }
+
+    return totalInvalidated;
   }
 
   async invalidateByUrl(url: string, method: string = "GET"): Promise<void> {
     await clientCacheManager.delete(url, method);
     console.log(`[SyncManager] Invalidated cache by URL: ${method} ${url}`);
+  }
+
+  private extractClientConfigFromEntry(entry: any): any {
+    if (!entry) return {};
+
+    return {
+      revalidate: Math.floor((entry.expiresAt - entry.createdAt) / 1000),
+      tags: entry.tags || [],
+    };
   }
 }
 
