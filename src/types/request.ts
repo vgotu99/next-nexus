@@ -5,4 +5,8 @@ export interface NextFetchRequestConfig extends RequestInit {
   isInterceptor?: boolean;
   timeout?: number;
   clientCache?: ClientCache;
+  next?: {
+    revalidate?: number;
+    tags?: string[];
+  };
 }
