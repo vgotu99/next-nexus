@@ -1,4 +1,6 @@
-import type { CacheEntry, FullCacheEntry } from "../types";
+import type { CacheEntry, FullCacheEntry, CacheConfig } from "../types";
+import { CacheError } from "../errors/CacheError";
+import { cacheOptimizer } from "./CacheOptimizer";
 
 export class ClientCacheManager {
   private readonly cacheStorageName = "next-fetch-cache";
@@ -6,16 +8,25 @@ export class ClientCacheManager {
 
   private async getCacheStorage(): Promise<Cache> {
     if (typeof window === "undefined") {
-      throw new Error(
+      throw CacheError.unavailable(
         "ClientCacheManager can only be used in browser environment"
       );
     }
 
     if (!("caches" in window)) {
-      throw new Error("Cache Storage API is not supported in this browser");
+      throw CacheError.unsupported(
+        "Cache Storage API is not supported in this browser"
+      );
     }
 
-    return await caches.open(this.cacheStorageName);
+    try {
+      return await caches.open(this.cacheStorageName);
+    } catch (error) {
+      if (error instanceof Error && error.name === "QuotaExceededError") {
+        throw CacheError.quotaExceeded("Cache storage quota exceeded");
+      }
+      throw CacheError.unavailable("Failed to open cache storage");
+    }
   }
 
   private getCacheKey(fullURL: string, method: string = "GET"): string {
@@ -51,57 +62,107 @@ export class ClientCacheManager {
       serverCacheTimestamp?: string;
     } = {}
   ): Promise<void> {
-    try {
-      const cache = await this.getCacheStorage();
-      const {
-        method = "GET",
-        ttl = 300,
-        tags = [],
-        endpoint = fullURL,
-        serverRevalidateInterval,
-        serverCacheTimestamp,
-      } = options;
+    const startTime = performance.now();
+    const cacheKey = this.getCacheKey(fullURL, options.method || "GET");
 
-      const cacheKey = this.getCacheKey(fullURL, method);
-      const now = Date.now();
+    const result = await cacheOptimizer.handleGracefulDegradation(
+      async () => {
+        // Check storage quota before attempting to store
+        const hasQuota = await cacheOptimizer.checkStorageQuota();
+        if (!hasQuota) {
+          // Trigger cleanup and retry
+          await cacheOptimizer.performCleanup();
 
-      const cacheEntry: CacheEntry = {
-        data,
-        createdAt: now,
-        expiresAt: now + ttl * 1000,
-        tags,
-        endpoint,
-        fullURL,
-        method: method.toUpperCase(),
-        serverRevalidateInterval,
-        serverCacheTimestamp,
-      };
+          const hasQuotaAfterCleanup = await cacheOptimizer.checkStorageQuota();
+          if (!hasQuotaAfterCleanup) {
+            throw CacheError.quotaExceeded(
+              "Storage quota exceeded even after cleanup"
+            );
+          }
+        }
 
-      const dataResponse = new Response(JSON.stringify(data), {
-        headers: {
-          "Content-Type": "application/json",
-          "X-Cache-Timestamp": now.toString(),
-          "X-Cache-TTL": ttl.toString(),
-          "X-Cache-Tags": tags.join(","),
-        },
-      });
+        const cache = await this.getCacheStorage();
+        const {
+          method = "GET",
+          ttl = 300,
+          tags = [],
+          endpoint = fullURL,
+          serverRevalidateInterval,
+          serverCacheTimestamp,
+        } = options;
 
-      const metadataResponse = new Response(JSON.stringify(cacheEntry), {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+        const now = Date.now();
 
-      await Promise.all([
-        cache.put(cacheKey, dataResponse),
-        cache.put(this.getMetadataKey(cacheKey), metadataResponse),
-      ]);
+        const cacheEntry: CacheEntry = {
+          data,
+          createdAt: now,
+          expiresAt: now + ttl * 1000,
+          tags,
+          endpoint,
+          fullURL,
+          method: method.toUpperCase(),
+          serverRevalidateInterval,
+          serverCacheTimestamp,
+        };
 
-      if (process.env.NODE_ENV === "development") {
-        console.log(`ClientCache: Stored ${method} ${fullURL} (TTL: ${ttl}s)`);
+        const dataResponse = new Response(JSON.stringify(data), {
+          headers: {
+            "Content-Type": "application/json",
+            "X-Cache-Timestamp": now.toString(),
+            "X-Cache-TTL": ttl.toString(),
+            "X-Cache-Tags": tags.join(","),
+          },
+        });
+
+        const metadataResponse = new Response(JSON.stringify(cacheEntry), {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        try {
+          await Promise.all([
+            cache.put(cacheKey, dataResponse),
+            cache.put(this.getMetadataKey(cacheKey), metadataResponse),
+          ]);
+
+          cacheOptimizer.recordPerformance("set", startTime, true, cacheKey);
+
+          if (process.env.NODE_ENV === "development") {
+            console.log(
+              `ClientCache: Stored ${method} ${fullURL} (TTL: ${ttl}s)`
+            );
+          }
+        } catch (error) {
+          cacheOptimizer.recordPerformance(
+            "set",
+            startTime,
+            false,
+            cacheKey,
+            error instanceof Error ? error.message : String(error)
+          );
+
+          if (error instanceof Error && error.name === "QuotaExceededError") {
+            throw CacheError.quotaExceeded(
+              "Failed to store cache entry: quota exceeded"
+            );
+          }
+          throw CacheError.operationFailed(
+            "Failed to store cache entry",
+            error as Error
+          );
+        }
+      },
+      {
+        fallbackToNetwork: false,
+        logErrors: true,
       }
-    } catch (error) {
-      console.error("Failed to store cache:", error);
+    );
+
+    if (result === null) {
+      throw CacheError.operationFailed(
+        "Cache set operation failed after all retries"
+      );
     }
   }
 
