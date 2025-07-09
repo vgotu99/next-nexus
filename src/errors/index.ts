@@ -1,2 +1,3 @@
 export { NextFetchError } from "./NextFetchError";
-export * from './errorCodes'
+export { CacheError } from "./CacheError";
+export * from "./errorCodes";
