@@ -15,6 +15,7 @@ export interface CacheEntry {
   fullURL: string;
   method: string;
   serverRevalidateInterval?: number;
+  serverCacheTimestamp?: string;
 }
 
 export interface CacheEntryMethods {
@@ -32,6 +33,7 @@ export interface RequestCacheItem {
   config: any;
   timestamp: number;
   tags: string[];
+  serverCacheTimestamp?: string;
 }
 
 export interface RevalidationInfo {
@@ -45,4 +47,15 @@ export interface CacheStatus {
   age?: number;
   responseTime?: number;
   serverCacheStatus?: "HIT" | "MISS" | "STALE";
+}
+
+export interface ServerCacheMetadata {
+  timestamp: string;
+  tags: string[];
+}
+
+export interface SyncResult {
+  wasServerCacheUpdated: boolean;
+  shouldUpdateClientCache: boolean;
+  newServerTimestamp?: string;
 }
