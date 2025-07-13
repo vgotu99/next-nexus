@@ -1,24 +1,22 @@
-import { ERROR_CODES, NextFetchError } from '@/errors';
 import type { NextFetchResponse } from '@/types';
+import {
+  isJsonResponse,
+  parseJsonResponse,
+  createNextFetchResponse,
+  isClientEnvironment,
+} from './responseProcessor';
 
 export const processResponse = async <T>(
   response: Response,
   requestMethod?: string
-): Promise<NextFetchResponse<T>> => {
-  const nextFetchResponse = response as NextFetchResponse<T>;
+): Promise<NextFetchResponse<T | undefined>> => {
+  const data = isJsonResponse(response)
+    ? await parseJsonResponse<T>(response)
+    : undefined;
 
-  if (response.headers.get('content-type')?.includes('application/json')) {
-    try {
-      nextFetchResponse.data = await response.json();
-    } catch (error) {
-      throw new NextFetchError('Invalid JSON response', {
-        request: new Request(response.url),
-        code: ERROR_CODES.ERR_BAD_RESPONSE,
-      });
-    }
-  }
+  const nextFetchResponse = createNextFetchResponse(response, data);
 
-  if (typeof window !== 'undefined') {
+  if (isClientEnvironment()) {
     await handleServerCacheSync(response, nextFetchResponse, requestMethod);
   }
 
