@@ -1,5 +1,5 @@
-import type { CacheEntry, FullCacheEntry, CacheConfig } from "../types";
-import { CacheError } from "../errors/CacheError";
+import type { CacheEntry, FullCacheEntry } from "@/types";
+import { CacheError } from "@/errors/CacheError";
 import { cacheOptimizer } from "./CacheOptimizer";
 
 export class ClientCacheManager {

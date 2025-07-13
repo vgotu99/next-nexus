@@ -1,16 +1,16 @@
-import { executeRequest, setupHeaders, setupTimeout } from "../utils";
+import { executeRequest, setupHeaders, setupTimeout } from "@/utils";
 import type {
   NextFetchInstance,
   NextFetchInterceptorOptions,
   NextFetchRequestConfig,
-} from "../types";
+} from "@/types";
 import { createMethods } from "./methods";
 import {
   createRequestInterceptor,
   createResponseInterceptor,
 } from "./interceptor";
-import { applyRequestInterceptors, applyResponseInterceptors } from "../utils";
-import { clientCacheManager, getRequestCache } from "../cache";
+import { applyRequestInterceptors, applyResponseInterceptors } from "@/utils";
+import { clientCacheManager, getRequestCache } from "@/cache";
 
 export const createNextFetchInstance = (
   defaultConfig: NextFetchRequestConfig = {}

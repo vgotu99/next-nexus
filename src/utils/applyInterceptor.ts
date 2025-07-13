@@ -1,9 +1,9 @@
 import {
   NextFetchRequestInterceptor,
   NextFetchResponseInterceptor,
-} from "../types";
-import { NextFetchRequestConfig } from "../types/request";
-import { NextFetchResponse } from "../types/response";
+} from "@/types";
+import { NextFetchRequestConfig } from "@/types/request";
+import { NextFetchResponse } from "@/types/response";
 
 export const applyRequestInterceptors = async (
   config: NextFetchRequestConfig,

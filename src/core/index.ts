@@ -1,4 +1,4 @@
-import type { NextFetchRequestConfig, NextFetchStatic } from "../types";
+import type { NextFetchRequestConfig, NextFetchStatic } from "@/types";
 import { createNextFetchInstance } from "./client";
 
 const nextFetch: NextFetchStatic = {

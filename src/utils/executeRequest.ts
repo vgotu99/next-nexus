@@ -1,5 +1,5 @@
-import type { NextFetchResponse } from "../types";
-import { ERROR_CODES, NextFetchError } from "../errors";
+import type { NextFetchResponse } from "@/types";
+import { ERROR_CODES, NextFetchError } from "@/errors";
 import { processResponse } from "./processResponse";
 
 export const executeRequest = async <T>(
