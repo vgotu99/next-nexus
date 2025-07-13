@@ -2,19 +2,25 @@ import type { CacheEntry, FullCacheEntry } from '@/types';
 import { CacheError } from '@/errors/CacheError';
 import { cacheOptimizer } from './CacheOptimizer';
 import { clientCacheLogger } from '@/utils/logger';
+import {
+  createCacheKey,
+  normalizeHttpMethod,
+  isCacheApiSupported,
+} from '@/utils/httpUtils';
+import { isClientEnvironment } from '@/utils/responseProcessor';
 
 export class ClientCacheManager {
   private readonly cacheStorageName = 'next-fetch-cache';
   private readonly metadataPrefix = '__metadata__';
 
   private async getCacheStorage(): Promise<Cache> {
-    if (typeof window === 'undefined') {
+    if (!isClientEnvironment()) {
       throw CacheError.unavailable(
         'ClientCacheManager can only be used in browser environment'
       );
     }
 
-    if (!('caches' in window)) {
+    if (!isCacheApiSupported()) {
       throw CacheError.unsupported(
         'Cache Storage API is not supported in this browser'
       );
@@ -30,8 +36,8 @@ export class ClientCacheManager {
     }
   }
 
-  private getCacheKey(fullURL: string, method: string = 'GET'): string {
-    return `${method.toUpperCase()}:${fullURL}`;
+  private getCacheKey(fullURL: string, method?: string): string {
+    return createCacheKey(fullURL, method);
   }
 
   private getMetadataKey(cacheKey: string): string {
@@ -101,7 +107,7 @@ export class ClientCacheManager {
           tags,
           endpoint,
           fullURL,
-          method: method.toUpperCase(),
+          method: normalizeHttpMethod(method),
           serverRevalidateInterval,
           serverCacheTimestamp,
         };
@@ -267,7 +273,7 @@ export class ClientCacheManager {
 
   async clear(): Promise<void> {
     try {
-      if (typeof window !== 'undefined' && 'caches' in window) {
+      if (isCacheApiSupported()) {
         await caches.delete(this.cacheStorageName);
 
         clientCacheLogger.info('🗑️ Cleared all cache');

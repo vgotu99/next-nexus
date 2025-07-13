@@ -5,3 +5,5 @@ export * from './setupTimeout';
 export * from './applyInterceptor';
 export * from './httpErrorFactory';
 export * from './responseProcessor';
+export * from './logger';
+export * from './httpUtils';
