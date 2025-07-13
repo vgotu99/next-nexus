@@ -1,6 +1,6 @@
-import type { SyncResult, ServerCacheMetadata } from "../types";
-import { revalidationDetector } from "./RevalidationDetector";
-import { clientCacheManager } from "./ClientCacheManager";
+import type { SyncResult, ServerCacheMetadata } from '@/types';
+import { revalidationDetector } from './RevalidationDetector';
+import { clientCacheManager } from './ClientCacheManager';
 
 export class SyncManager {
   async handleSync(
@@ -29,7 +29,7 @@ export class SyncManager {
 
         if (
           syncResult.wasServerCacheUpdated &&
-          process.env.NODE_ENV === "development"
+          process.env.NODE_ENV === 'development'
         ) {
           console.log(
             `[next-fetch] Server cache updated, client cache synchronized: ${url}`
@@ -69,7 +69,7 @@ export class SyncManager {
   }
 
   private getClientCacheTTL(clientCacheConfig: any): number {
-    if (!clientCacheConfig || typeof clientCacheConfig === "boolean") {
+    if (!clientCacheConfig || typeof clientCacheConfig === 'boolean') {
       return 300;
     }
     return clientCacheConfig.revalidate || 300;
@@ -80,8 +80,8 @@ export class SyncManager {
   }
 
   async invalidateByTags(tags: string[]): Promise<number> {
-    if (typeof window === "undefined") {
-      console.warn("[next-fetch] Client cache invalidation skipped on server");
+    if (typeof window === 'undefined') {
+      console.warn('[next-fetch] Client cache invalidation skipped on server');
       return 0;
     }
 
@@ -92,10 +92,10 @@ export class SyncManager {
       totalInvalidated += count;
     }
 
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.NODE_ENV === 'development') {
       console.log(
         `[next-fetch] Invalidated ${totalInvalidated} cache entries by tags: ${tags.join(
-          ", "
+          ', '
         )}`
       );
     }
@@ -103,7 +103,7 @@ export class SyncManager {
     return totalInvalidated;
   }
 
-  async invalidateByUrl(url: string, method: string = "GET"): Promise<void> {
+  async invalidateByUrl(url: string, method: string = 'GET'): Promise<void> {
     await clientCacheManager.delete(url, method);
     console.log(`[SyncManager] Invalidated cache by URL: ${method} ${url}`);
   }

@@ -1,9 +1,9 @@
-import type { ServerCacheMetadata, SyncResult } from "../types";
+import type { ServerCacheMetadata, SyncResult } from '@/types';
 
 export class RevalidationDetector {
   extractServerCacheMetadata(response: Response): ServerCacheMetadata | null {
-    const timestamp = response.headers.get("x-server-cache-timestamp");
-    const tags = response.headers.get("x-server-cache-tags");
+    const timestamp = response.headers.get('x-server-cache-timestamp');
+    const tags = response.headers.get('x-server-cache-tags');
 
     if (!timestamp) {
       return null;
@@ -11,7 +11,7 @@ export class RevalidationDetector {
 
     return {
       timestamp,
-      tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
+      tags: tags ? tags.split(',').map(tag => tag.trim()) : [],
     };
   }
 

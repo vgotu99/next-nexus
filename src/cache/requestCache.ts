@@ -1,5 +1,5 @@
 import { cache } from "react";
-import type { RequestCacheItem } from "../types";
+import type { RequestCacheItem } from "@/types";
 
 const createKey = (fullURL: string, method: string) => `${method}:${fullURL}`;
 

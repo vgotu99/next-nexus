@@ -2,7 +2,7 @@ import type {
   NextFetchInstance,
   NextFetchRequestConfig,
   NextFetchResponse,
-} from "../types";
+} from '@/types';
 
 export const createMethods = (
   nextFetch: <T>(
@@ -13,7 +13,7 @@ export const createMethods = (
   const instance = nextFetch as NextFetchInstance;
 
   instance.get = <T>(endpoint: string, options?: NextFetchRequestConfig) => {
-    return nextFetch<T>(endpoint, { ...options, method: "GET" });
+    return nextFetch<T>(endpoint, { ...options, method: 'GET' });
   };
 
   instance.post = <T, D = Record<string, any>>(
@@ -23,7 +23,7 @@ export const createMethods = (
   ) => {
     return nextFetch<T>(endpoint, {
       ...options,
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify(data),
     });
   };
@@ -35,7 +35,7 @@ export const createMethods = (
   ) => {
     return nextFetch<T>(endpoint, {
       ...options,
-      method: "PUT",
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   };
@@ -47,13 +47,13 @@ export const createMethods = (
   ) => {
     return nextFetch<T>(endpoint, {
       ...options,
-      method: "PATCH",
+      method: 'PATCH',
       body: JSON.stringify(data),
     });
   };
 
   instance.delete = <T>(endpoint: string, options?: NextFetchRequestConfig) => {
-    return nextFetch<T>(endpoint, { ...options, method: "DELETE" });
+    return nextFetch<T>(endpoint, { ...options, method: 'DELETE' });
   };
 
   return instance;

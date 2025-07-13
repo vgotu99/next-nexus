@@ -3,8 +3,8 @@ import type {
   CacheMetrics,
   CachePerformanceEntry,
   GracefulDegradationOptions,
-} from "../types";
-import { CacheError } from "../errors/CacheError";
+} from '@/types';
+import { CacheError } from '@/errors/CacheError';
 
 export class CacheOptimizer {
   private config: Required<CacheConfig>;
@@ -41,18 +41,18 @@ export class CacheOptimizer {
   }
 
   private startSchedulers(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     this.cleanupTimer = setInterval(() => {
-      this.performCleanup().catch((error) => {
-        console.warn("[next-fetch] Auto-cleanup failed:", error);
+      this.performCleanup().catch(error => {
+        console.warn('[next-fetch] Auto-cleanup failed:', error);
       });
     }, this.config.cleanupInterval);
 
     if (this.config.enableMetrics) {
       this.metricsTimer = setInterval(() => {
-        this.collectMetrics().catch((error) => {
-          console.warn("[next-fetch] Metrics collection failed:", error);
+        this.collectMetrics().catch(error => {
+          console.warn('[next-fetch] Metrics collection failed:', error);
         });
       }, this.config.metricsInterval);
     }
@@ -66,15 +66,13 @@ export class CacheOptimizer {
     let cleanedCount = 0;
 
     try {
-      if (typeof window === "undefined" || !("caches" in window)) {
+      if (typeof window === 'undefined' || !('caches' in window)) {
         return 0;
       }
 
-      const cache = await caches.open("next-fetch-cache");
+      const cache = await caches.open('next-fetch-cache');
       const keys = await cache.keys();
-      const metadataKeys = keys.filter((key) =>
-        key.url.includes("__metadata__")
-      );
+      const metadataKeys = keys.filter(key => key.url.includes('__metadata__'));
 
       for (let i = 0; i < metadataKeys.length; i += this.config.batchSize) {
         const batch = metadataKeys.slice(i, i + this.config.batchSize);
@@ -83,7 +81,7 @@ export class CacheOptimizer {
 
       this.metrics.lastCleanup = Date.now();
 
-      if (process.env.NODE_ENV === "development") {
+      if (process.env.NODE_ENV === 'development') {
         console.log(
           `[next-fetch] Cleanup completed: ${cleanedCount} expired entries removed`
         );
@@ -92,14 +90,14 @@ export class CacheOptimizer {
       return cleanedCount;
     } catch (error) {
       this.recordPerformance(
-        "cleanup",
+        'cleanup',
         startTime,
         false,
         undefined,
         error instanceof Error ? error.message : String(error)
       );
       throw CacheError.operationFailed(
-        "Cleanup operation failed",
+        'Cleanup operation failed',
         error as Error
       );
     } finally {
@@ -119,12 +117,12 @@ export class CacheOptimizer {
         const isExpired = Date.now() > metadata.expiresAt;
 
         if (isExpired) {
-          const cacheKey = key.url.replace("__metadata__", "");
+          const cacheKey = key.url.replace('__metadata__', '');
           await Promise.all([cache.delete(key), cache.delete(cacheKey)]);
           batchCleanedCount++;
         }
       } catch (error) {
-        console.warn("[next-fetch] Failed to process cache entry:", error);
+        console.warn('[next-fetch] Failed to process cache entry:', error);
       }
     }
 
@@ -135,11 +133,11 @@ export class CacheOptimizer {
     const startTime = performance.now();
 
     try {
-      if (typeof window === "undefined" || !("caches" in window)) {
+      if (typeof window === 'undefined' || !('caches' in window)) {
         return this.metrics;
       }
 
-      const cache = await caches.open("next-fetch-cache");
+      const cache = await caches.open('next-fetch-cache');
       const keys = await cache.keys();
 
       let totalSize = 0;
@@ -155,7 +153,7 @@ export class CacheOptimizer {
           }
         } catch (error) {
           console.warn(
-            "[next-fetch] Failed to calculate cache entry size:",
+            '[next-fetch] Failed to calculate cache entry size:',
             error
           );
         }
@@ -163,9 +161,9 @@ export class CacheOptimizer {
 
       const recentEntries = this.performanceHistory.slice(-100);
       const getOperations = recentEntries.filter(
-        (entry) => entry.operation === "get"
+        entry => entry.operation === 'get'
       );
-      const hits = getOperations.filter((entry) => entry.success).length;
+      const hits = getOperations.filter(entry => entry.success).length;
       const hitRate =
         getOperations.length > 0 ? hits / getOperations.length : 0;
 
@@ -175,7 +173,7 @@ export class CacheOptimizer {
             getOperations.length
           : 0;
 
-      const errors = recentEntries.filter((entry) => !entry.success).length;
+      const errors = recentEntries.filter(entry => !entry.success).length;
       const errorRate =
         recentEntries.length > 0 ? errors / recentEntries.length : 0;
 
@@ -191,25 +189,25 @@ export class CacheOptimizer {
         quotaUsage,
       };
 
-      this.recordPerformance("cleanup", startTime, true);
+      this.recordPerformance('cleanup', startTime, true);
       return this.metrics;
     } catch (error) {
       this.recordPerformance(
-        "cleanup",
+        'cleanup',
         startTime,
         false,
         undefined,
         error instanceof Error ? error.message : String(error)
       );
       throw CacheError.operationFailed(
-        "Metrics collection failed",
+        'Metrics collection failed',
         error as Error
       );
     }
   }
 
   recordPerformance(
-    operation: CachePerformanceEntry["operation"],
+    operation: CachePerformanceEntry['operation'],
     startTime: number,
     success: boolean,
     cacheKey?: string,
@@ -235,7 +233,7 @@ export class CacheOptimizer {
 
   async checkStorageQuota(): Promise<boolean> {
     try {
-      if (typeof window === "undefined" || !navigator.storage?.estimate) {
+      if (typeof window === 'undefined' || !navigator.storage?.estimate) {
         return true;
       }
 
@@ -247,7 +245,7 @@ export class CacheOptimizer {
 
       if (usageRatio > 0.9) {
         console.warn(
-          "[next-fetch] Storage quota nearly exceeded:",
+          '[next-fetch] Storage quota nearly exceeded:',
           `${Math.round(usageRatio * 100)}% used`
         );
         return false;
@@ -255,7 +253,7 @@ export class CacheOptimizer {
 
       return true;
     } catch (error) {
-      console.warn("[next-fetch] Failed to check storage quota:", error);
+      console.warn('[next-fetch] Failed to check storage quota:', error);
       return true;
     }
   }
@@ -291,7 +289,7 @@ export class CacheOptimizer {
         }
 
         if (attempt < this.config.retryAttempts - 1) {
-          await new Promise((resolve) =>
+          await new Promise(resolve =>
             setTimeout(resolve, this.config.retryDelay)
           );
         }
@@ -300,13 +298,13 @@ export class CacheOptimizer {
 
     if (logErrors) {
       console.error(
-        "[next-fetch] Cache operation failed after all retries:",
+        '[next-fetch] Cache operation failed after all retries:',
         lastError
       );
     }
 
     if (reportMetrics) {
-      this.recordPerformance("get", 0, false, undefined, lastError?.message);
+      this.recordPerformance('get', 0, false, undefined, lastError?.message);
     }
 
     return null;

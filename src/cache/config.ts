@@ -1,33 +1,30 @@
-import type { CacheConfig, CacheMetrics } from "../types";
-import { cacheOptimizer } from "./CacheOptimizer";
+import type { CacheConfig, CacheMetrics } from '@/types';
+import { cacheOptimizer } from './CacheOptimizer';
 
 export const configureCacheSettings = (config: Partial<CacheConfig>): void => {
   cacheOptimizer.updateConfig(config);
 
-  if (process.env.NODE_ENV === "development") {
-    console.log("[next-fetch] Cache settings updated:", config);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[next-fetch] Cache settings updated:', config);
   }
-}
-
+};
 
 export const getCacheMetrics = (): CacheMetrics => {
   return cacheOptimizer.getMetrics();
-}
-
+};
 
 export const triggerCacheCleanup = async (): Promise<number> => {
   try {
     return await cacheOptimizer.performCleanup();
   } catch (error) {
-    console.error("[next-fetch] Manual cache cleanup failed:", error);
+    console.error('[next-fetch] Manual cache cleanup failed:', error);
     return 0;
   }
-}
-
+};
 
 export const checkStorageQuota = async (): Promise<boolean> => {
   return await cacheOptimizer.checkStorageQuota();
-}
+};
 
 export const getDefaultCacheConfig = (): Required<CacheConfig> => {
   return {
@@ -41,4 +38,4 @@ export const getDefaultCacheConfig = (): Required<CacheConfig> => {
     retryAttempts: 3,
     retryDelay: 1000,
   };
-}
+};

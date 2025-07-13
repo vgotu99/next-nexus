@@ -1,7 +1,7 @@
 import {
   NextFetchRequestInterceptor,
   NextFetchResponseInterceptor,
-} from "../types";
+} from "@/types";
 
 export const createRequestInterceptor = () => {
   const interceptors: Map<string, NextFetchRequestInterceptor> = new Map();
