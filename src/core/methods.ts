@@ -4,6 +4,20 @@ import type {
   NextFetchResponse,
 } from '@/types';
 
+const createDataMethodConfig = <D>(
+  method: string,
+  data?: D,
+  options?: NextFetchRequestConfig
+): NextFetchRequestConfig => ({
+  ...options,
+  method,
+  body: data ? JSON.stringify(data) : undefined,
+  headers: {
+    'Content-Type': 'application/json',
+    ...options?.headers,
+  },
+});
+
 export const createMethods = (
   nextFetch: <T>(
     endpoint: string,
@@ -21,11 +35,10 @@ export const createMethods = (
     data?: D,
     options?: NextFetchRequestConfig
   ) => {
-    return nextFetch<T>(endpoint, {
-      ...options,
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return nextFetch<T>(
+      endpoint,
+      createDataMethodConfig('POST', data, options)
+    );
   };
 
   instance.put = <T, D = Record<string, any>>(
@@ -33,11 +46,7 @@ export const createMethods = (
     data?: D,
     options?: NextFetchRequestConfig
   ) => {
-    return nextFetch<T>(endpoint, {
-      ...options,
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    return nextFetch<T>(endpoint, createDataMethodConfig('PUT', data, options));
   };
 
   instance.patch = <T, D = Record<string, any>>(
@@ -45,11 +54,10 @@ export const createMethods = (
     data?: D,
     options?: NextFetchRequestConfig
   ) => {
-    return nextFetch<T>(endpoint, {
-      ...options,
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
+    return nextFetch<T>(
+      endpoint,
+      createDataMethodConfig('PATCH', data, options)
+    );
   };
 
   instance.delete = <T>(endpoint: string, options?: NextFetchRequestConfig) => {
