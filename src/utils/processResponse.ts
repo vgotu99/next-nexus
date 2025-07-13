@@ -5,6 +5,7 @@ import {
   createNextFetchResponse,
   isClientEnvironment,
 } from './responseProcessor';
+import { requestLogger } from './logger';
 
 export const processResponse = async <T>(
   response: Response,
@@ -46,13 +47,13 @@ const handleServerCacheSync = async <T>(
         null
       );
 
-      if (wasUpdated && process.env.NODE_ENV === 'development') {
-        console.log(
-          `[next-fetch] Server cache change detected, client cache synchronized: ${method} ${url}`
+      if (wasUpdated) {
+        requestLogger.info(
+          `Server cache change detected, client cache synchronized: ${method} ${url}`
         );
       }
     }
   } catch (error) {
-    console.warn('[next-fetch] Server cache synchronization failed:', error);
+    requestLogger.warn('Server cache synchronization failed', error);
   }
 };
