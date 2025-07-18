@@ -1,12 +1,5 @@
 type LogLevel = 'info' | 'warn' | 'error';
 
-interface LogEntry {
-  level: LogLevel;
-  module: string;
-  message: string;
-  data?: any;
-}
-
 const isDevelopment = (): boolean => {
   return process.env.NODE_ENV === 'development';
 };

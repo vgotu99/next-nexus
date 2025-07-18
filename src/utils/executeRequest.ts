@@ -1,11 +1,12 @@
-import type { NextFetchResponse } from '@/types';
 import { NextFetchError } from '@/errors';
-import { processResponse } from './processResponse';
+import type { NextFetchResponse } from '@/types';
+
 import {
   validateUrl,
   createHttpError,
   createNetworkError,
 } from './httpErrorFactory';
+import { processResponse } from './processResponse';
 
 type TimeoutCleanup = () => void;
 

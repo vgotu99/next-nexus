@@ -1,4 +1,4 @@
-import React from "react";
+import React from 'react';
 
 interface NextFetchProviderProps {
   children: React.ReactNode;
@@ -6,4 +6,4 @@ interface NextFetchProviderProps {
 
 export const NextFetchProvider = ({ children }: NextFetchProviderProps) => {
   return <>{children}</>;
-}
+};

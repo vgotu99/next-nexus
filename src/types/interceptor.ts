@@ -1,5 +1,5 @@
-import { NextFetchRequestConfig } from "./request";
-import { NextFetchResponse } from "./response";
+import { NextFetchRequestConfig } from './request';
+import { NextFetchResponse } from './response';
 
 export interface NextFetchRequestInterceptor {
   name: string;
@@ -25,8 +25,8 @@ export interface NextFetchInterceptors {
   request: {
     use: (
       name: string,
-      onFulfilled: NextFetchRequestInterceptor["onFulfilled"],
-      onRejected?: NextFetchRequestInterceptor["onRejected"]
+      onFulfilled: NextFetchRequestInterceptor['onFulfilled'],
+      onRejected?: NextFetchRequestInterceptor['onRejected']
     ) => void;
     remove: (name: string) => void;
     getAll: () => NextFetchRequestInterceptor[];
@@ -35,8 +35,8 @@ export interface NextFetchInterceptors {
   response: {
     use: (
       name: string,
-      onFulfilled: NextFetchResponseInterceptor["onFulfilled"],
-      onRejected?: NextFetchResponseInterceptor["onRejected"]
+      onFulfilled: NextFetchResponseInterceptor['onFulfilled'],
+      onRejected?: NextFetchResponseInterceptor['onRejected']
     ) => void;
     remove: (name: string) => void;
     getAll: () => NextFetchResponseInterceptor[];

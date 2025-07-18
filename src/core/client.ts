@@ -1,16 +1,22 @@
-import { executeRequest, setupHeaders, setupTimeout } from '@/utils';
 import type {
   NextFetchInstance,
   NextFetchInterceptorOptions,
   NextFetchRequestConfig,
   NextFetchResponse,
 } from '@/types';
-import { createMethods } from './methods';
+import {
+  executeRequest,
+  setupHeaders,
+  setupTimeout,
+  applyRequestInterceptors,
+  applyResponseInterceptors,
+} from '@/utils';
+
 import {
   createRequestInterceptor,
   createResponseInterceptor,
 } from './interceptor';
-import { applyRequestInterceptors, applyResponseInterceptors } from '@/utils';
+import { createMethods } from './methods';
 
 const buildRequest = (
   url: string,
@@ -65,7 +71,6 @@ const processRequest = async <T>(
   defaultTimeout?: number,
   restDefaultConfig: NextFetchRequestConfig = {}
 ): Promise<NextFetchResponse<T>> => {
-
   const { requestConfig, timeoutId } = buildRequest(
     url,
     config,
@@ -74,29 +79,25 @@ const processRequest = async <T>(
     restDefaultConfig
   );
 
-  try {
-    const requestInterceptors = requestInterceptor.getByNames(interceptors);
-    const modifiedConfig =
-      requestInterceptors.length > 0
-        ? await applyRequestInterceptors(requestConfig, requestInterceptors)
-        : requestConfig;
+  const requestInterceptors = requestInterceptor.getByNames(interceptors);
+  const modifiedConfig =
+    requestInterceptors.length > 0
+      ? await applyRequestInterceptors(requestConfig, requestInterceptors)
+      : requestConfig;
 
-    const request = new Request(url, modifiedConfig);
-    const response = await executeRequest<T>(request, timeoutId);
+  const request = new Request(url, modifiedConfig);
+  const response = await executeRequest<T>(request, timeoutId);
 
-    const responseInterceptors = responseInterceptor.getByNames(interceptors);
-    const modifiedResponse =
-      responseInterceptors.length > 0
-        ? await applyResponseInterceptors<T>(
-            response as NextFetchResponse<T>,
-            responseInterceptors
-          )
-        : (response as NextFetchResponse<T>);
+  const responseInterceptors = responseInterceptor.getByNames(interceptors);
+  const modifiedResponse =
+    responseInterceptors.length > 0
+      ? await applyResponseInterceptors<T>(
+          response as NextFetchResponse<T>,
+          responseInterceptors
+        )
+      : (response as NextFetchResponse<T>);
 
-    return modifiedResponse as NextFetchResponse<T>;
-  } catch (error) {
-    throw error;
-  }
+  return modifiedResponse as NextFetchResponse<T>;
 };
 
 export const createNextFetchInstance = (

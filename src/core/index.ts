@@ -1,5 +1,6 @@
-import type { NextFetchRequestConfig, NextFetchStatic } from "@/types";
-import { createNextFetchInstance } from "./client";
+import type { NextFetchRequestConfig, NextFetchStatic } from '@/types';
+
+import { createNextFetchInstance } from './client';
 
 const nextFetch: NextFetchStatic = {
   create: (config?: NextFetchRequestConfig) => {

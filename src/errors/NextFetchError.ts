@@ -1,4 +1,4 @@
-import { ErrorCode } from "./errorCodes";
+import { ErrorCode } from './errorCodes';
 
 export class NextFetchError extends Error {
   response?: {
@@ -30,7 +30,7 @@ export class NextFetchError extends Error {
     } = {}
   ) {
     super(message);
-    this.name = "NextFetchError";
+    this.name = 'NextFetchError';
 
     if (options.response) {
       this.response = {

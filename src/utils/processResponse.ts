@@ -1,4 +1,5 @@
 import type { NextFetchResponse } from '@/types';
+
 import {
   isJsonResponse,
   parseJsonResponse,
@@ -7,7 +8,7 @@ import {
 
 export const processResponse = async <T>(
   response: Response,
-  requestMethod?: string
+  _requestMethod?: string
 ): Promise<NextFetchResponse<T | undefined>> => {
   const data = isJsonResponse(response)
     ? await parseJsonResponse<T>(response)
