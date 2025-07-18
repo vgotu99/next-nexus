@@ -1,3 +1,4 @@
+export * from './cache';
 export * from './instance';
 export * from './interceptor';
 export * from './request';

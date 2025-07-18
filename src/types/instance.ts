@@ -35,6 +35,6 @@ export interface NextFetchInstance {
   interceptors: NextFetchInterceptors;
 }
 
-export interface NextFetchStatic {
+export type NextFetchStatic = {
   create(config?: NextFetchRequestConfig): NextFetchInstance;
-}
+};
