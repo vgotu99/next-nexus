@@ -1,4 +1,4 @@
-import { setupHeaders } from '../setupHeaders';
+import { setupHeaders } from '@/utils';
 
 describe('setupHeaders', () => {
   it('should create empty headers when no arguments provided', () => {

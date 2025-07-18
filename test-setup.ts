@@ -7,6 +7,46 @@ Object.defineProperty(window, 'location', {
 
 (global as any).fetch = jest.fn();
 
+(global as any).Request = class MockRequest {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: any;
+
+  constructor(url: string, init?: RequestInit) {
+    this.url = url;
+    this.method = init?.method || 'GET';
+    this.headers = new Headers(init?.headers);
+    this.body = init?.body;
+  }
+};
+
+(global as any).Response = class MockResponse {
+  status: number;
+  statusText: string;
+  headers: Headers;
+  body: any;
+  ok: boolean;
+
+  constructor(body?: any, init?: ResponseInit) {
+    this.body = body;
+    this.status = init?.status || 200;
+    this.statusText = init?.statusText || 'OK';
+    this.headers = new Headers(init?.headers);
+    this.ok = this.status >= 200 && this.status < 300;
+  }
+
+  async json() {
+    return typeof this.body === 'string' ? JSON.parse(this.body) : this.body;
+  }
+
+  async text() {
+    return typeof this.body === 'string'
+      ? this.body
+      : JSON.stringify(this.body);
+  }
+};
+
 global.caches = {
   open: jest.fn(),
   delete: jest.fn(),
