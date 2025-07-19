@@ -4,6 +4,7 @@ import type {
   CacheUtils,
   CacheRevalidateTime,
 } from '@/types';
+import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
 
 export const generateCacheKey = ({
   endpoint,
@@ -28,7 +29,7 @@ export const generateCacheKey = ({
 };
 
 export const isCacheEntryExpired = (entry: CacheEntry): boolean =>
-  Date.now() > entry.expiresAt;
+  isPast(entry.expiresAt);
 
 export const calculateCacheTTL = (revalidate?: CacheRevalidateTime): number => {
   if (
@@ -64,7 +65,7 @@ export const createCacheEntry = <T>(
   tags: string[] = [],
   etag?: string
 ): CacheEntry<T> => {
-  const now = Date.now();
+  const now = getCurrentTimestamp();
   const expiresAt = ttl === Infinity ? Infinity : now + ttl;
 
   return {

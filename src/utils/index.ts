@@ -6,4 +6,6 @@ export * from './applyInterceptor';
 export * from './httpErrorFactory';
 export * from './responseProcessor';
 export * from './logger';
-export * from './httpUtils';
+export * from './cacheUtils';
+export * from './environmentUtils';
+export * from './timeUtils';
