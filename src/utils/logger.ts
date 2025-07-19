@@ -1,8 +1,6 @@
-type LogLevel = 'info' | 'warn' | 'error';
+import { isDevelopment } from './environmentUtils';
 
-const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development';
-};
+type LogLevel = 'info' | 'warn' | 'error';
 
 const formatMessage = (module: string, message: string): string => {
   return `[next-fetch:${module}] ${message}`;

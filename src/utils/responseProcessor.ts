@@ -26,7 +26,3 @@ export const createNextFetchResponse = <T>(
   nextFetchResponse.data = data;
   return nextFetchResponse;
 };
-
-export const isClientEnvironment = (): boolean => {
-  return typeof window !== 'undefined';
-};
