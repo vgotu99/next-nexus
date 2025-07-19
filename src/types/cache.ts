@@ -57,8 +57,8 @@ export type CacheScope = 'server+client' | 'serverOnly' | 'clientOnly';
 export type CacheRevalidateTime = number | false;
 
 export type CacheUtils = {
-  generateKey: (options: CacheKeyOptions) => string;
-  isExpired: (entry: CacheEntry) => boolean;
-  calculateTTL: (revalidate?: number) => number;
-  normalizeTags: (tags?: string[]) => string[];
+  generateCacheKey: (options: CacheKeyOptions) => string;
+  isCacheEntryExpired: (entry: CacheEntry) => boolean;
+  calculateCacheTTL: (revalidate?: CacheRevalidateTime) => number;
+  normalizeCacheTags: (tags?: string[]) => string[];
 };
