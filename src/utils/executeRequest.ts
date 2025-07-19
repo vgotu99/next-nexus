@@ -1,4 +1,4 @@
-import { NextFetchError } from '@/errors';
+import { isNextFetchError } from '@/errors/errorFactory';
 import type { NextFetchResponse } from '@/types';
 
 import {
@@ -46,7 +46,7 @@ export const executeRequest = async <T>(
   } catch (error) {
     cleanup();
 
-    if (error instanceof NextFetchError) {
+    if (isNextFetchError(error)) {
       throw error;
     }
 

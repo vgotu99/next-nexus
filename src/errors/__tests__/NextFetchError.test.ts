@@ -1,4 +1,5 @@
-import { ERROR_CODES, NextFetchError } from '@/errors';
+import { ERROR_CODES } from '../errorCodes';
+import { isNextFetchError, NextFetchError } from '../NextFetchError';
 
 const mockRequest = jest.fn();
 const mockResponse = jest.fn();
@@ -8,7 +9,7 @@ const mockResponse = jest.fn();
 
 describe('NextFetchError', () => {
   it('should create error with message only', () => {
-    const error = new NextFetchError('Test error');
+    const error = NextFetchError('Test error');
 
     expect(error.name).toBe('NextFetchError');
     expect(error.message).toBe('Test error');
@@ -24,7 +25,7 @@ describe('NextFetchError', () => {
       headers: new Headers({ 'Content-Type': 'application/json' }),
     } as Response;
 
-    const error = new NextFetchError('Resource not found', {
+    const error = NextFetchError('Resource not found', {
       response: mockResponse,
       data: { error: 'Not Found' },
       code: ERROR_CODES.ERR_NOT_FOUND,
@@ -44,7 +45,7 @@ describe('NextFetchError', () => {
       method: 'GET',
     } as Request;
 
-    const error = new NextFetchError('Network error', {
+    const error = NextFetchError('Network error', {
       request: mockRequest,
       code: ERROR_CODES.ERR_NETWORK,
     });
@@ -56,14 +57,14 @@ describe('NextFetchError', () => {
   });
 
   it('should inherit from Error', () => {
-    const error = new NextFetchError('Test error');
+    const error = NextFetchError('Test error');
 
     expect(error instanceof Error).toBe(true);
-    expect(error instanceof NextFetchError).toBe(true);
+    expect(isNextFetchError(error)).toBe(true);
   });
 
   it('should preserve stack trace', () => {
-    const error = new NextFetchError('Test error');
+    const error = NextFetchError('Test error');
 
     expect(error.stack).toBeDefined();
     expect(typeof error.stack).toBe('string');

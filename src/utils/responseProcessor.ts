@@ -1,4 +1,5 @@
-import { ERROR_CODES, NextFetchError } from '@/errors';
+import { ERROR_CODES } from '@/errors/errorCodes';
+import { createNextFetchError } from '@/errors/errorFactory';
 import type { NextFetchResponse } from '@/types';
 
 export const isJsonResponse = (response: Response): boolean => {
@@ -11,7 +12,7 @@ export const parseJsonResponse = async <T>(response: Response): Promise<T> => {
   try {
     return await response.json();
   } catch (error) {
-    throw new NextFetchError('Invalid JSON response', {
+    throw createNextFetchError('Invalid JSON response', {
       request: new Request(response.url),
       code: ERROR_CODES.ERR_BAD_RESPONSE,
     });

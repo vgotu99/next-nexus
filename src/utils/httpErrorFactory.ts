@@ -1,45 +1,30 @@
-import { ERROR_CODES, ErrorCode, NextFetchError } from '@/errors';
+import { ERROR_CODES } from '@/errors/errorCodes';
+import { createNextFetchError } from '@/errors/errorFactory';
+import type {
+  NextFetchErrorData,
+  NextFetchErrorInfo,
+} from '@/errors/errorTypes';
+import {
+  extractErrorMessage,
+  getErrorCodeByStatus,
+  getErrorMessageByStatus,
+} from '@/errors/errorUtils';
 
 export const createHttpError = (
   status: number,
   response: Response,
   request: Request,
-  errorData: any
-): NextFetchError => {
-  const errorMap: Record<number, { message: string; code: ErrorCode }> = {
-    400: { message: 'Bad Request', code: ERROR_CODES.ERR_BAD_REQUEST },
-    401: { message: 'Unauthorized', code: ERROR_CODES.ERR_UNAUTHORIZED },
-    403: { message: 'Forbidden', code: ERROR_CODES.ERR_FORBIDDEN },
-    404: { message: 'Not Found', code: ERROR_CODES.ERR_NOT_FOUND },
-    408: { message: 'Request Timeout', code: ERROR_CODES.ERR_TIMEOUT },
-    429: { message: 'Too Many Requests', code: ERROR_CODES.ERR_RATE_LIMITED },
-  };
+  errorData: NextFetchErrorData
+): NextFetchErrorInfo => {
+  const message =
+    extractErrorMessage(errorData) || getErrorMessageByStatus(status);
+  const code = getErrorCodeByStatus(status);
 
-  const errorInfo = errorMap[status];
-
-  if (errorInfo) {
-    return new NextFetchError(errorInfo.message, {
-      response,
-      request,
-      data: errorData,
-      code: errorInfo.code,
-    });
-  }
-
-  if (status >= 500) {
-    return new NextFetchError(`Server Error: ${status}`, {
-      response,
-      request,
-      data: errorData,
-      code: ERROR_CODES.ERR_SERVER,
-    });
-  }
-
-  return new NextFetchError(`Request failed with status ${status}`, {
+  return createNextFetchError(message, {
     response,
     request,
     data: errorData,
-    code: ERROR_CODES.ERR_BAD_RESPONSE,
+    code,
   });
 };
 
@@ -47,7 +32,7 @@ export const validateUrl = (url: string): void => {
   try {
     new URL(url);
   } catch (error) {
-    throw new NextFetchError('Invalid URL', {
+    throw createNextFetchError('Invalid URL', {
       request: new Request(url),
       code: ERROR_CODES.ERR_INVALID_URL,
     });
@@ -57,20 +42,20 @@ export const validateUrl = (url: string): void => {
 export const createNetworkError = (
   error: unknown,
   request: Request
-): NextFetchError => {
+): NextFetchErrorInfo => {
   if (error instanceof TypeError) {
     if (
       error.message.includes('Failed to fetch') ||
       error.message.includes('NetworkError')
     ) {
-      return new NextFetchError('Network Error', {
+      return createNextFetchError('Network Error', {
         request,
         code: ERROR_CODES.ERR_NETWORK,
       });
     }
 
     if (error.message.includes('CORS')) {
-      return new NextFetchError('CORS Error', {
+      return createNextFetchError('CORS Error', {
         request,
         code: ERROR_CODES.ERR_NETWORK,
       });
@@ -79,12 +64,12 @@ export const createNetworkError = (
 
   if (error instanceof DOMException && error.name === 'AbortError') {
     if (error.message === 'timeout') {
-      return new NextFetchError('Request timeout', {
+      return createNextFetchError('Request timeout', {
         request,
         code: ERROR_CODES.ERR_TIMEOUT,
       });
     } else {
-      return new NextFetchError('Request canceled', {
+      return createNextFetchError('Request canceled', {
         request,
         code: ERROR_CODES.ERR_CANCELED,
       });
@@ -92,13 +77,13 @@ export const createNetworkError = (
   }
 
   if (error instanceof SyntaxError && error.message.includes('JSON')) {
-    return new NextFetchError('Invalid JSON response', {
+    return createNextFetchError('Invalid JSON response', {
       request,
       code: ERROR_CODES.ERR_BAD_RESPONSE,
     });
   }
 
-  return new NextFetchError(
+  return createNextFetchError(
     error instanceof Error ? error.message : 'Unknown error',
     {
       request,
