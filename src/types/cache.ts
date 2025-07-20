@@ -76,3 +76,13 @@ export type CacheUtils = {
   calculateCacheTTL: (revalidate?: CacheRevalidateTime) => number;
   normalizeCacheTags: (tags?: string[]) => string[];
 };
+
+export interface HydrationData {
+  [cacheKey: string]: {
+    data: unknown;
+    timestamp: number;
+    clientRevalidate?: number;
+    clientTags?: string[];
+    serverTags?: string[];
+  };
+}
