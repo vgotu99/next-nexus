@@ -10,7 +10,8 @@ export const generateCacheKey = ({
   endpoint,
   method = 'GET',
   params,
-  tags,
+  clientTags,
+  serverTags,
 }: CacheKeyOptions): string => {
   const baseKey = `${method.toUpperCase()}:${endpoint}`;
 
@@ -22,8 +23,9 @@ export const generateCacheKey = ({
           .join('&')}`
       : null;
 
+  const allTags = [...(clientTags || []), ...(serverTags || [])];
   const tagsComponent =
-    tags && tags.length > 0 ? `tags:${[...tags].sort().join(',')}` : null;
+    allTags.length > 0 ? `tags:${[...allTags].sort().join(',')}` : null;
 
   return [baseKey, paramComponent, tagsComponent].filter(Boolean).join('|');
 };
@@ -62,7 +64,8 @@ export const createCacheEntry = <T>(
   data: T,
   key: string,
   ttl: number,
-  tags: string[] = [],
+  clientTags: string[] = [],
+  serverTags: string[] = [],
   etag?: string
 ): CacheEntry<T> => {
   const now = getCurrentTimestamp();
@@ -73,7 +76,8 @@ export const createCacheEntry = <T>(
     key,
     createdAt: now,
     expiresAt,
-    tags: normalizeCacheTags(tags),
+    clientTags: normalizeCacheTags(clientTags),
+    serverTags: normalizeCacheTags(serverTags),
     etag,
   };
 };

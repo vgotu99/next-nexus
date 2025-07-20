@@ -1,8 +1,4 @@
-import type {
-  CacheEntry,
-  ClientCacheEntry,
-  ClientCacheState,
-} from '@/types/cache';
+import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,
   isCacheEntryExpired,
@@ -28,10 +24,11 @@ const createClientCacheEntry = <T>(
   data: T,
   key: string,
   ttl: number,
-  tags: string[] = [],
+  clientTags: string[] = [],
+  serverTags: string[] = [],
   source: ClientCacheEntry['source'] = 'manual'
 ): ClientCacheEntry<T> => {
-  const baseEntry = createCacheEntry(data, key, ttl, tags);
+  const baseEntry = createCacheEntry(data, key, ttl, clientTags, serverTags);
   return {
     ...baseEntry,
     source,
@@ -78,7 +75,13 @@ const filterByTags = (
   const normalizedTags = normalizeCacheTags(tags);
 
   return Array.from(clientCache.entries())
-    .filter(([, entry]) => hasCommonTags(entry.tags, normalizedTags))
+    .filter(([, entry]) => {
+      const allEntryTags = [
+        ...(entry.clientTags || []),
+        ...(entry.serverTags || []),
+      ];
+      return hasCommonTags(allEntryTags, normalizedTags);
+    })
     .map(([key]) => key);
 };
 
@@ -136,7 +139,7 @@ const get = async <T = unknown>(
 
 const set = async <T = unknown>(
   key: string,
-  entry: CacheEntry<T>
+  entry: ClientCacheEntry<T>
 ): Promise<void> => {
   if (!isClientEnvironment()) {
     return;
@@ -154,20 +157,15 @@ const set = async <T = unknown>(
     clientCacheState.clientCache.delete(lruKey);
   }
 
-  const clientEntry: ClientCacheEntry<T> = {
-    ...entry,
-    source: 'manual',
-    lastAccessed: getCurrentTimestamp(),
-  };
-
-  clientCacheState.clientCache.set(key, clientEntry);
+  clientCacheState.clientCache.set(key, entry);
 };
 
 const setWithTTL = async <T = unknown>(
   key: string,
   data: T,
   clientRevalidate?: number,
-  tags: string[] = [],
+  clientTags?: string[],
+  serverTags?: string[],
   source: ClientCacheEntry['source'] = 'fetch'
 ): Promise<void> => {
   if (!isClientEnvironment()) {
@@ -177,7 +175,14 @@ const setWithTTL = async <T = unknown>(
   const ttl = clientRevalidate
     ? clientRevalidate * 1000
     : clientCacheState.defaultTTL;
-  const entry = createClientCacheEntry(data, key, ttl, tags, source);
+  const entry = createClientCacheEntry(
+    data,
+    key,
+    ttl,
+    clientTags,
+    serverTags,
+    source
+  );
 
   await set(key, entry);
 };

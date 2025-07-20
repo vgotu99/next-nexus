@@ -14,20 +14,23 @@ export interface CacheOptions {
   client?: ClientCacheOptions;
 }
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   data: T;
   createdAt: number;
   expiresAt: number;
-  tags: string[];
   etag?: string;
   key: string;
+  clientRevalidate?: number;
+  clientTags?: string[];
+  serverTags?: string[];
 }
 
 export interface CacheKeyOptions {
   endpoint: string;
   method?: string;
   params?: Record<string, any>;
-  tags?: string[];
+  clientTags?: string[];
+  serverTags?: string[];
 }
 
 export interface CacheInvalidationOptions {
@@ -50,6 +53,17 @@ export interface CacheManagerConfig {
   defaultTTL?: number;
   storage?: CacheStorage;
   debug?: boolean;
+}
+
+export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
+  source: 'fetch' | 'hydration' | 'manual';
+  lastAccessed: number;
+}
+
+export interface ClientCacheState {
+  clientCache: Map<string, ClientCacheEntry>;
+  maxSize: number;
+  defaultTTL: number;
 }
 
 export type CacheScope = 'server+client' | 'serverOnly' | 'clientOnly';
