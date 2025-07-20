@@ -5,3 +5,8 @@ export interface NextFetchRequestConfig extends RequestInit, CacheOptions {
   isInterceptor?: boolean;
   timeout?: number;
 }
+
+export interface NextOptions {
+  revalidate?: number | false;
+  tags?: string[];
+}

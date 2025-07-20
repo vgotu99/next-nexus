@@ -3,6 +3,8 @@ import type {
   NextFetchInterceptorOptions,
   NextFetchRequestConfig,
   NextFetchResponse,
+  NextOptions,
+  ServerCacheOptions,
 } from '@/types';
 import {
   executeRequest,
@@ -18,6 +20,24 @@ import {
 } from './interceptor';
 import { createMethods } from './methods';
 
+const transformServerOptionsToNextOptions = (
+  server?: ServerCacheOptions
+): NextOptions | undefined => {
+  if (!server) return undefined;
+
+  const nextOptions: NextOptions = {};
+
+  if (server.revalidate !== undefined) {
+    nextOptions.revalidate = server.revalidate;
+  }
+
+  if (server.tags?.length) {
+    nextOptions.tags = server.tags;
+  }
+
+  return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
+};
+
 const buildRequest = (
   url: string,
   config: NextFetchRequestConfig,
@@ -25,14 +45,17 @@ const buildRequest = (
   defaultTimeout?: number,
   restDefaultConfig: NextFetchRequestConfig = {}
 ) => {
+  const { server, ...restConfig } = config;
   const abortController = new AbortController();
   const timeout = config.timeout || defaultTimeout;
   const timeoutId = setupTimeout(abortController, timeout);
   const headers = setupHeaders(defaultHeaders, config.headers);
+  const next = transformServerOptionsToNextOptions(server);
 
-  const requestConfig: NextFetchRequestConfig = {
+  const requestConfig: NextFetchRequestConfig & { next?: NextOptions } = {
     ...restDefaultConfig,
-    ...config,
+    ...restConfig,
+    next,
     headers,
     signal: abortController.signal,
   };
