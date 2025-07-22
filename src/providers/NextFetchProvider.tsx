@@ -1,10 +1,15 @@
 import type { ReactNode } from 'react';
 
 import { requestCache } from '@/cache/requestCache';
+import {
+  extractClientCacheStateFromHeaders,
+  hasClientCacheEntryByCacheKey,
+} from '@/cache/serverCacheStateProcessor';
 import type { CacheEntry, HydrationData } from '@/types/cache';
 import { getCurrentTimestamp, isServerEnvironment } from '@/utils';
 
 import CacheHydrator from './CacheHydrator';
+import { ClientProvider } from './ClientProvider';
 
 interface NextFetchProviderProps {
   children: ReactNode;
@@ -22,6 +27,10 @@ const collectCacheData = async (): Promise<HydrationData> => {
   try {
     const keys = await requestCache.keys();
 
+    const clientCacheState: ReturnType<
+      typeof extractClientCacheStateFromHeaders
+    > = [];
+
     const hydrationEntries = await Promise.all(
       keys.map(async key => {
         const cachedEntry = await requestCache.get<CacheEntry>(key);
@@ -29,6 +38,10 @@ const collectCacheData = async (): Promise<HydrationData> => {
         const entry = cachedEntry;
 
         if (!entry) {
+          return null;
+        }
+
+        if (hasClientCacheEntryByCacheKey(clientCacheState, key)) {
           return null;
         }
 
@@ -51,14 +64,15 @@ const collectCacheData = async (): Promise<HydrationData> => {
 
     return Object.fromEntries(validEntries);
   } catch (error) {
-    console.warn('Failed to collect cache data:', error);
+    console.warn(
+      '[next-fetch] Failed to collect cache data for hydration:',
+      error
+    );
     return {};
   }
 };
 
-const createHydrationScript = (
-  hydrationData: HydrationData
-): ReactNode => {
+const createHydrationScript = (hydrationData: HydrationData): ReactNode => {
   const hasData = Object.keys(hydrationData).length > 0;
 
   return hasData ? (
@@ -74,7 +88,7 @@ const ServerNextFetchProvider = async ({
   children,
 }: NextFetchProviderProps) => {
   const content = await requestCache.runWith(async () => {
-    const renderedChildren = children;
+    const renderedChildren = <>{children}</>;
 
     const hydrationData = await collectCacheData();
     const hydrationScript = createHydrationScript(hydrationData);
@@ -91,15 +105,16 @@ const ServerNextFetchProvider = async ({
 };
 
 const ClientNextFetchProvider = ({ children }: NextFetchProviderProps) => (
-  <>
+  <ClientProvider>
     <CacheHydrator />
     {children}
-  </>
+  </ClientProvider>
 );
 
-export const NextFetchProvider = ({ children }: NextFetchProviderProps) =>
-  isServerEnvironment() ? (
+export const NextFetchProvider = ({ children }: NextFetchProviderProps) => {
+  return isServerEnvironment() ? (
     <ServerNextFetchProvider>{children}</ServerNextFetchProvider>
   ) : (
     <ClientNextFetchProvider>{children}</ClientNextFetchProvider>
   );
+};

@@ -6,13 +6,6 @@ import { clientCache } from '@/cache/clientCache';
 import type { HydrationData } from '@/types/cache';
 import { isClientEnvironment, isDevelopment } from '@/utils/environmentUtils';
 
-declare global {
-  interface Window {
-    __NEXT_FETCH_HYDRATION__?: HydrationData;
-    __nextFetchClientCache?: typeof clientCache;
-  }
-}
-
 const getHydrationData = (): HydrationData | null => {
   try {
     return isClientEnvironment() && window.__NEXT_FETCH_HYDRATION__
