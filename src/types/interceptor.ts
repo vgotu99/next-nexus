@@ -11,9 +11,9 @@ export interface NextFetchRequestInterceptor {
   onRejected?: InterceptorHandler<unknown>;
 }
 
-export interface NextFetchResponseInterceptor {
+export interface NextFetchResponseInterceptor<T> {
   name: string;
-  onFulfilled: InterceptorHandler<InternalNextFetchResponse<unknown>>;
+  onFulfilled: InterceptorHandler<InternalNextFetchResponse<T>>;
   onRejected?: InterceptorHandler<unknown>;
 }
 
@@ -33,13 +33,13 @@ export interface NextFetchInterceptors {
     get: (name: string) => NextFetchRequestInterceptor | undefined;
   };
   response: {
-    use: (
+    use: <TData = unknown>(
       name: string,
-      onFulfilled: NextFetchResponseInterceptor['onFulfilled'],
-      onRejected?: NextFetchResponseInterceptor['onRejected']
+      onFulfilled: NextFetchResponseInterceptor<TData>['onFulfilled'],
+      onRejected?: NextFetchResponseInterceptor<TData>['onRejected']
     ) => void;
+    getAll: () => NextFetchResponseInterceptor<unknown>[];
     remove: (name: string) => void;
-    getAll: () => NextFetchResponseInterceptor[];
-    get: (name: string) => NextFetchResponseInterceptor | undefined;
+    get: (name: string) => NextFetchResponseInterceptor<unknown> | undefined;
   };
 }
