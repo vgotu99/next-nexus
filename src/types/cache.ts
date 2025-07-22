@@ -86,3 +86,13 @@ export interface HydrationData {
     serverTags?: string[];
   };
 }
+
+export type ClientCacheMetadata = Omit<
+  CacheEntry,
+  'data' | 'createdAt' | 'clientRevalidate'
+>;
+
+export interface SerializedCacheState {
+  metadata: ClientCacheMetadata[];
+  timestamp: number;
+}
