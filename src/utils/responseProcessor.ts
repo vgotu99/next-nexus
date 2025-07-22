@@ -1,6 +1,6 @@
 import { ERROR_CODES } from '@/errors/errorCodes';
 import { createNextFetchError } from '@/errors/errorFactory';
-import type { NextFetchResponse } from '@/types';
+import type { InternalNextFetchResponse } from '@/types/internal';
 
 export const isJsonResponse = (response: Response): boolean => {
   return (
@@ -21,9 +21,27 @@ export const parseJsonResponse = async <T>(response: Response): Promise<T> => {
 
 export const createNextFetchResponse = <T>(
   response: Response,
-  data: T
-): NextFetchResponse<T> => {
-  const nextFetchResponse = response as NextFetchResponse<T>;
-  nextFetchResponse.data = data;
-  return nextFetchResponse;
+  data: T | undefined,
+): InternalNextFetchResponse<T | undefined> => {
+  const internalResponse: InternalNextFetchResponse<T | undefined> = {
+    ...response,
+    data,
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+    ok: response.ok,
+    redirected: response.redirected,
+    type: response.type,
+    url: response.url,
+    arrayBuffer: () => response.arrayBuffer(),
+    blob: () => response.blob(),
+    formData: () => response.formData(),
+    json: () => response.json(),
+    text: () => response.text(),
+    clone: () => response.clone(),
+    config: {} as any,
+    request: {} as any,
+  };
+
+  return internalResponse;
 };

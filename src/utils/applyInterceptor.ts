@@ -1,14 +1,16 @@
-import {
+import type {
   NextFetchRequestInterceptor,
   NextFetchResponseInterceptor,
-} from '@/types';
-import { NextFetchRequestConfig } from '@/types/request';
-import { NextFetchResponse } from '@/types/response';
+} from '@/types/interceptor';
+import type {
+  InternalNextFetchRequestConfig,
+  InternalNextFetchResponse,
+} from '@/types/internal';
 
 export const applyRequestInterceptors = async (
-  config: NextFetchRequestConfig,
+  config: InternalNextFetchRequestConfig,
   interceptors: NextFetchRequestInterceptor[]
-): Promise<NextFetchRequestConfig> => {
+): Promise<InternalNextFetchRequestConfig> => {
   return interceptors.reduce(
     async (configPromise, interceptor) => {
       const currentConfig = await configPromise;
@@ -27,15 +29,18 @@ export const applyRequestInterceptors = async (
 };
 
 export const applyResponseInterceptors = async <T>(
-  response: NextFetchResponse<T>,
-  interceptors: NextFetchResponseInterceptor[]
-): Promise<NextFetchResponse<T>> => {
+  response: InternalNextFetchResponse<T | undefined>,
+  interceptors: NextFetchResponseInterceptor<unknown>[]
+): Promise<InternalNextFetchResponse<T | undefined>> => {
   return interceptors.reduce(
     async (responsePromise, interceptor) => {
       const currentResponse = await responsePromise;
 
       try {
-        return await interceptor.onFulfilled(currentResponse);
+        const result = await interceptor.onFulfilled(
+          currentResponse as InternalNextFetchResponse<unknown>
+        );
+        return result as InternalNextFetchResponse<T | undefined>;
       } catch (error) {
         if (interceptor.onRejected) {
           throw interceptor.onRejected(error);

@@ -1,5 +1,5 @@
 import { isNextFetchError } from '@/errors/errorFactory';
-import type { NextFetchResponse } from '@/types';
+import type { InternalNextFetchResponse } from '@/types/internal';
 
 import {
   validateUrl,
@@ -29,7 +29,7 @@ const handleErrorResponse = async (
 export const executeRequest = async <T>(
   request: Request,
   timeoutId?: NodeJS.Timeout
-): Promise<NextFetchResponse<T | undefined>> => {
+): Promise<InternalNextFetchResponse<T | undefined>> => {
   const cleanup: TimeoutCleanup = () => cleanupTimeout(timeoutId);
 
   try {
@@ -42,7 +42,7 @@ export const executeRequest = async <T>(
       await handleErrorResponse(response, request);
     }
 
-    return await processResponse<T>(response, request.method);
+    return processResponse<T>(response, request.method);
   } catch (error) {
     cleanup();
 
