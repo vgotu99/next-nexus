@@ -1,3 +1,7 @@
+import {
+  extractClientCacheStateFromHeaders,
+  hasClientCacheEntryByCacheKey,
+} from '@/cache/serverCacheStateProcessor';
 import type {
   NextFetchInstance,
   NextFetchInterceptorOptions,
@@ -63,6 +67,24 @@ const buildRequest = (
   return { requestConfig, timeoutId };
 };
 
+const shouldSkipDueToClientCache = (
+  headers: Headers,
+  url: string,
+  method: string
+): boolean => {
+  if (method.toUpperCase() !== 'GET') {
+    return false;
+  }
+
+  const clientCacheState = extractClientCacheStateFromHeaders(headers);
+  if (clientCacheState.length === 0) {
+    return false;
+  }
+
+  const cacheKey = `${method.toUpperCase()}:${url}`;
+  return hasClientCacheEntryByCacheKey(clientCacheState, cacheKey);
+};
+
 const createInterceptorInterface = (
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
@@ -85,7 +107,6 @@ const createInterceptorInterface = (
 
 const processRequest = async <T>(
   url: string,
-  endpoint: string,
   config: NextFetchRequestConfig,
   interceptors: string[] | undefined,
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
@@ -107,6 +128,45 @@ const processRequest = async <T>(
     requestInterceptors.length > 0
       ? await applyRequestInterceptors(requestConfig, requestInterceptors)
       : requestConfig;
+
+  if (typeof window === 'undefined' && modifiedConfig.headers) {
+    const headers =
+      modifiedConfig.headers instanceof Headers
+        ? modifiedConfig.headers
+        : new Headers(modifiedConfig.headers);
+
+    if (
+      shouldSkipDueToClientCache(headers, url, modifiedConfig.method || 'GET')
+    ) {
+      const mockResponse = new Response('null', {
+        status: 204,
+        statusText: 'Client Cache Hit',
+        headers: { 'x-next-fetch-cache-status': 'CLIENT_HIT' },
+      });
+
+      return {
+        data: null as T,
+        status: 204,
+        statusText: 'Client Cache Hit',
+        headers: mockResponse.headers,
+        config: modifiedConfig,
+        request: new Request(url, modifiedConfig),
+        ok: true,
+        redirected: false,
+        type: 'basic' as ResponseType,
+        url: url,
+        clone: () => mockResponse.clone(),
+        arrayBuffer: () => mockResponse.arrayBuffer(),
+        blob: () => mockResponse.blob(),
+        formData: () => mockResponse.formData(),
+        json: () => Promise.resolve(null),
+        text: () => Promise.resolve('null'),
+        bytes: () => mockResponse.bytes(),
+        body: null,
+        bodyUsed: false,
+      } as NextFetchResponse<T>;
+    }
+  }
 
   const request = new Request(url, modifiedConfig);
   const response = await executeRequest<T>(request, timeoutId);
@@ -145,7 +205,6 @@ export const createNextFetchInstance = (
 
     return processRequest<T>(
       url,
-      endpoint,
       restConfig,
       interceptors,
       requestInterceptor,
