@@ -21,7 +21,7 @@ export const parseJsonResponse = async <T>(response: Response): Promise<T> => {
 
 export const createNextFetchResponse = <T>(
   response: Response,
-  data: T | undefined,
+  data: T | undefined
 ): InternalNextFetchResponse<T | undefined> => {
   const internalResponse: InternalNextFetchResponse<T | undefined> = {
     ...response,
@@ -38,9 +38,10 @@ export const createNextFetchResponse = <T>(
     formData: () => response.formData(),
     json: () => response.json(),
     text: () => response.text(),
-    clone: () => response.clone(),
-    config: {} as any,
-    request: {} as any,
+    clone: () => {
+      const clonedResponse = response.clone();
+      return createNextFetchResponse(clonedResponse, data);
+    },
   };
 
   return internalResponse;

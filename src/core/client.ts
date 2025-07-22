@@ -175,6 +175,16 @@ const executeRequestWithLifecycle = async <T>(
     ...response,
     config: modifiedConfig,
     request,
+    clone: () => {
+      const clonedResponse = response.clone();
+      const clonedInternalResponse: InternalNextFetchResponse<T | undefined> = {
+        ...clonedResponse,
+        config: modifiedConfig,
+        request,
+        data: clonedResponse.data,
+      };
+      return clonedInternalResponse;
+    },
   };
 
   const responseInterceptors = responseInterceptor.getByNames(interceptors);
