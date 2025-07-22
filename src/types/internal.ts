@@ -7,8 +7,9 @@ export interface InternalNextFetchRequestConfig extends NextFetchRequestConfig {
 
 export interface InternalNextFetchResponse<T = unknown>
   extends NextFetchResponse<T> {
-  config: InternalNextFetchRequestConfig;
+  config?: InternalNextFetchRequestConfig;
   request?: Request;
+  clone(): InternalNextFetchResponse<T>;
 }
 
 export interface NextOptions {

@@ -3,19 +3,25 @@ import {
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
 import type {
+  InterceptorHandler,
   NextFetchInstance,
   NextFetchInterceptorOptions,
+  NextFetchInterceptors,
   NextFetchRequestConfig,
   NextFetchResponse,
-  NextOptions,
   ServerCacheOptions,
 } from '@/types';
+import type {
+  InternalNextFetchRequestConfig,
+  InternalNextFetchResponse,
+  NextOptions,
+} from '@/types/internal';
 import {
+  applyRequestInterceptors,
+  applyResponseInterceptors,
   executeRequest,
   setupHeaders,
   setupTimeout,
-  applyRequestInterceptors,
-  applyResponseInterceptors,
 } from '@/utils';
 
 import {
@@ -30,11 +36,9 @@ const transformServerOptionsToNextOptions = (
   if (!server) return undefined;
 
   const nextOptions: NextOptions = {};
-
   if (server.revalidate !== undefined) {
     nextOptions.revalidate = server.revalidate;
   }
-
   if (server.tags?.length) {
     nextOptions.tags = server.tags;
   }
@@ -42,13 +46,12 @@ const transformServerOptionsToNextOptions = (
   return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
 };
 
-const buildRequest = (
-  url: string,
+const buildRequestConfig = (
   config: NextFetchRequestConfig,
   defaultHeaders: HeadersInit,
   defaultTimeout?: number,
   restDefaultConfig: NextFetchRequestConfig = {}
-) => {
+): InternalNextFetchRequestConfig => {
   const { server, ...restConfig } = config;
   const abortController = new AbortController();
   const timeout = config.timeout || defaultTimeout;
@@ -56,23 +59,59 @@ const buildRequest = (
   const headers = setupHeaders(defaultHeaders, config.headers);
   const next = transformServerOptionsToNextOptions(server);
 
-  const requestConfig: NextFetchRequestConfig & { next?: NextOptions } = {
+  return {
     ...restDefaultConfig,
     ...restConfig,
     next,
     headers,
     signal: abortController.signal,
+    timeoutId,
   };
-
-  return { requestConfig, timeoutId };
 };
 
-const shouldSkipDueToClientCache = (
+const createCachedResponse = <T>(
+  url: string,
+  config: InternalNextFetchRequestConfig
+): InternalNextFetchResponse<T | null> => {
+  const response = new Response(JSON.stringify(null), {
+    status: 204,
+    statusText: 'Client Cache Hit',
+    headers: { ['x-next-fetch-cache-status']: 'CLIENT_HIT' },
+  });
+
+  const cachedResponse: Omit<InternalNextFetchResponse<T | null>, 'clone'> = {
+    ...response,
+    ok: true,
+    redirected: false,
+    status: 204,
+    statusText: 'Client Cache Hit',
+    type: 'basic',
+    url,
+    data: null,
+    config,
+    request: new Request(url, config),
+    headers: new Headers(response.headers),
+    json: () => Promise.resolve(null),
+    text: () => Promise.resolve(JSON.stringify(null)),
+    blob: () => response.blob(),
+    arrayBuffer: () => response.arrayBuffer(),
+    formData: () => response.formData(),
+    body: null,
+    bodyUsed: true,
+  };
+
+  return {
+    ...cachedResponse,
+    clone: () => createCachedResponse(url, config),
+  };
+};
+
+const shouldSkipRequest = (
   headers: Headers,
   url: string,
-  method: string
+  method?: string
 ): boolean => {
-  if (method.toUpperCase() !== 'GET') {
+  if (method?.toUpperCase() !== 'GET') {
     return false;
   }
 
@@ -88,99 +127,58 @@ const shouldSkipDueToClientCache = (
 const createInterceptorInterface = (
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
-) => ({
+): NextFetchInterceptors => ({
   request: {
-    use: (name: string, onFulfilled: any, onRejected?: any) =>
+    use: (name, onFulfilled, onRejected?) =>
       requestInterceptor.use(name, onFulfilled, onRejected),
-    remove: (name: string) => requestInterceptor.remove(name),
+    remove: name => requestInterceptor.remove(name),
     getAll: () => requestInterceptor.getAll(),
-    get: (name: string) => requestInterceptor.get(name),
+    get: name => requestInterceptor.get(name),
   },
   response: {
-    use: (name: string, onFulfilled: any, onRejected?: any) =>
-      responseInterceptor.use(name, onFulfilled, onRejected),
-    remove: (name: string) => responseInterceptor.remove(name),
+    use: (name, onFulfilled, onRejected?) =>
+      responseInterceptor.use(
+        name,
+        onFulfilled as InterceptorHandler<InternalNextFetchResponse<unknown>>,
+        onRejected
+      ),
+    remove: name => responseInterceptor.remove(name),
     getAll: () => responseInterceptor.getAll(),
-    get: (name: string) => responseInterceptor.get(name),
+    get: name => responseInterceptor.get(name),
   },
 });
 
-const processRequest = async <T>(
+const executeRequestWithLifecycle = async <T>(
   url: string,
-  config: NextFetchRequestConfig,
+  config: InternalNextFetchRequestConfig,
   interceptors: string[] | undefined,
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
-  responseInterceptor: ReturnType<typeof createResponseInterceptor>,
-  defaultHeaders: HeadersInit,
-  defaultTimeout?: number,
-  restDefaultConfig: NextFetchRequestConfig = {}
-): Promise<NextFetchResponse<T>> => {
-  const { requestConfig, timeoutId } = buildRequest(
-    url,
+  responseInterceptor: ReturnType<typeof createResponseInterceptor>
+): Promise<InternalNextFetchResponse<T | null | undefined>> => {
+  const requestInterceptors = requestInterceptor.getByNames(interceptors);
+  const modifiedConfig = await applyRequestInterceptors(
     config,
-    defaultHeaders,
-    defaultTimeout,
-    restDefaultConfig
+    requestInterceptors
   );
 
-  const requestInterceptors = requestInterceptor.getByNames(interceptors);
-  const modifiedConfig =
-    requestInterceptors.length > 0
-      ? await applyRequestInterceptors(requestConfig, requestInterceptors)
-      : requestConfig;
-
   if (typeof window === 'undefined' && modifiedConfig.headers) {
-    const headers =
-      modifiedConfig.headers instanceof Headers
-        ? modifiedConfig.headers
-        : new Headers(modifiedConfig.headers);
-
-    if (
-      shouldSkipDueToClientCache(headers, url, modifiedConfig.method || 'GET')
-    ) {
-      const mockResponse = new Response('null', {
-        status: 204,
-        statusText: 'Client Cache Hit',
-        headers: { 'x-next-fetch-cache-status': 'CLIENT_HIT' },
-      });
-
-      return {
-        data: null as T,
-        status: 204,
-        statusText: 'Client Cache Hit',
-        headers: mockResponse.headers,
-        config: modifiedConfig,
-        request: new Request(url, modifiedConfig),
-        ok: true,
-        redirected: false,
-        type: 'basic' as ResponseType,
-        url: url,
-        clone: () => mockResponse.clone(),
-        arrayBuffer: () => mockResponse.arrayBuffer(),
-        blob: () => mockResponse.blob(),
-        formData: () => mockResponse.formData(),
-        json: () => Promise.resolve(null),
-        text: () => Promise.resolve('null'),
-        bytes: () => mockResponse.bytes(),
-        body: null,
-        bodyUsed: false,
-      } as NextFetchResponse<T>;
+    const headers = new Headers(modifiedConfig.headers);
+    if (shouldSkipRequest(headers, url, modifiedConfig.method)) {
+      return createCachedResponse<T>(url, modifiedConfig);
     }
   }
 
   const request = new Request(url, modifiedConfig);
-  const response = await executeRequest<T>(request, timeoutId);
+  const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
+
+  const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
+    ...response,
+    config: modifiedConfig,
+    request,
+  };
 
   const responseInterceptors = responseInterceptor.getByNames(interceptors);
-  const modifiedResponse =
-    responseInterceptors.length > 0
-      ? await applyResponseInterceptors<T>(
-          response as NextFetchResponse<T>,
-          responseInterceptors
-        )
-      : (response as NextFetchResponse<T>);
-
-  return modifiedResponse as NextFetchResponse<T>;
+  return applyResponseInterceptors<T>(responseWithConfig, responseInterceptors);
 };
 
 export const createNextFetchInstance = (
@@ -199,20 +197,24 @@ export const createNextFetchInstance = (
   const nextFetch = async <T>(
     endpoint: string,
     config: NextFetchRequestConfig & NextFetchInterceptorOptions = {}
-  ) => {
+  ): Promise<NextFetchResponse<T>> => {
     const { interceptors, ...restConfig } = config;
     const url = `${baseURL}${endpoint}`;
 
-    return processRequest<T>(
-      url,
+    const requestConfig = buildRequestConfig(
       restConfig,
-      interceptors,
-      requestInterceptor,
-      responseInterceptor,
       defaultHeaders,
       defaultTimeout,
       restDefaultConfig
     );
+
+    return (await executeRequestWithLifecycle<T>(
+      url,
+      requestConfig,
+      interceptors,
+      requestInterceptor,
+      responseInterceptor
+    )) as NextFetchResponse<T>;
   };
 
   const instance = createMethods(nextFetch);
