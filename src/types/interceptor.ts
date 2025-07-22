@@ -1,20 +1,20 @@
-import { NextFetchRequestConfig } from './request';
-import { NextFetchResponse } from './response';
+import type {
+  InternalNextFetchRequestConfig,
+  InternalNextFetchResponse,
+} from './internal';
+
+export type InterceptorHandler<T> = (value: T) => T | Promise<T>;
 
 export interface NextFetchRequestInterceptor {
   name: string;
-  onFulfilled: (
-    config: NextFetchRequestConfig
-  ) => NextFetchRequestConfig | Promise<NextFetchRequestConfig>;
-  onRejected?: (error: any) => any;
+  onFulfilled: InterceptorHandler<InternalNextFetchRequestConfig>;
+  onRejected?: InterceptorHandler<unknown>;
 }
 
 export interface NextFetchResponseInterceptor {
   name: string;
-  onFulfilled: <T>(
-    response: NextFetchResponse<T>
-  ) => NextFetchResponse<T> | Promise<NextFetchResponse<T>>;
-  onRejected?: (error: any) => any;
+  onFulfilled: InterceptorHandler<InternalNextFetchResponse<unknown>>;
+  onRejected?: InterceptorHandler<unknown>;
 }
 
 export interface NextFetchInterceptorOptions {
