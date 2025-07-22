@@ -1,7 +1,7 @@
 import {
   NextFetchRequestInterceptor,
   NextFetchResponseInterceptor,
-} from '@/types';
+} from '@/types/interceptor';
 
 const createInterceptorManager = <T>() => {
   const interceptors: Map<string, T> = new Map();
@@ -43,7 +43,7 @@ export const createRequestInterceptor = () => {
     use: (
       name: string,
       onFulfilled: NextFetchRequestInterceptor['onFulfilled'],
-      onRejected?: NextFetchRequestInterceptor['onRejected']
+      onRejected?: NextFetchRequestInterceptor['onRejected'],
     ): void => {
       manager.use(name, { name, onFulfilled, onRejected });
     },
@@ -51,14 +51,14 @@ export const createRequestInterceptor = () => {
 };
 
 export const createResponseInterceptor = () => {
-  const manager = createInterceptorManager<NextFetchResponseInterceptor>();
+  const manager = createInterceptorManager<NextFetchResponseInterceptor<unknown>>();
 
   return {
     ...manager,
     use: (
       name: string,
-      onFulfilled: NextFetchResponseInterceptor['onFulfilled'],
-      onRejected?: NextFetchResponseInterceptor['onRejected']
+      onFulfilled: NextFetchResponseInterceptor<unknown>['onFulfilled'],
+      onRejected?: NextFetchResponseInterceptor<unknown>['onRejected'],
     ): void => {
       manager.use(name, { name, onFulfilled, onRejected });
     },
