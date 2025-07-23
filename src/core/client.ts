@@ -1,7 +1,9 @@
+import { handleNotModifiedResponse } from '@/cache/clientCacheLifecycleExtender';
 import {
   extractClientCacheStateFromHeaders,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
+import { createConditionalResponse } from '@/cache/serverETagValidator';
 import type {
   InterceptorHandler,
   NextFetchInstance,
@@ -20,6 +22,8 @@ import {
   applyRequestInterceptors,
   applyResponseInterceptors,
   executeRequest,
+  isClientEnvironment,
+  isServerEnvironment,
   setupHeaders,
   setupTimeout,
 } from '@/utils';
@@ -161,7 +165,7 @@ const executeRequestWithLifecycle = async <T>(
     requestInterceptors
   );
 
-  if (typeof window === 'undefined' && modifiedConfig.headers) {
+  if (isServerEnvironment() && modifiedConfig.headers) {
     const headers = new Headers(modifiedConfig.headers);
     if (shouldSkipRequest(headers, url, modifiedConfig.method)) {
       return createCachedResponse<T>(url, modifiedConfig);
@@ -170,6 +174,36 @@ const executeRequestWithLifecycle = async <T>(
 
   const request = new Request(url, modifiedConfig);
   const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
+
+  if (
+    isServerEnvironment() &&
+    response.data &&
+    modifiedConfig.headers
+  ) {
+    const headers = new Headers(modifiedConfig.headers);
+    const clientCacheMetadata = extractClientCacheStateFromHeaders(headers);
+
+    const conditionalResult = createConditionalResponse(
+      url,
+      response.data,
+      headers,
+      clientCacheMetadata
+    );
+
+    if (conditionalResult.shouldSkip && conditionalResult.response) {
+      const notModifiedResponse: InternalNextFetchResponse<
+        T | null | undefined
+      > = {
+        ...conditionalResult.response,
+        data: null,
+        config: modifiedConfig,
+        request,
+        clone: () => notModifiedResponse,
+      };
+
+      return notModifiedResponse;
+    }
+  }
 
   const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
     ...response,
@@ -188,7 +222,22 @@ const executeRequestWithLifecycle = async <T>(
   };
 
   const responseInterceptors = responseInterceptor.getByNames(interceptors);
-  return applyResponseInterceptors<T>(responseWithConfig, responseInterceptors);
+  const finalResponse = await applyResponseInterceptors<T>(
+    responseWithConfig,
+    responseInterceptors
+  );
+
+  if (isClientEnvironment() && finalResponse.status === 304) {
+    const cacheKey = `${config.method?.toUpperCase() || 'GET'}:${url}`;
+
+    await handleNotModifiedResponse(
+      finalResponse,
+      cacheKey,
+      config.client?.revalidate
+    );
+  }
+
+  return finalResponse;
 };
 
 export const createNextFetchInstance = (

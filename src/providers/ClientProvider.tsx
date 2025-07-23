@@ -3,8 +3,10 @@
 import { useEffect, type ReactNode } from 'react';
 
 import { createCacheStateHeader } from '@/cache/clientCacheStateCollector';
+import { createIfNoneMatchHeader } from '@/cache/expiredCacheETagCollector';
 
 const CLIENT_CACHE_HEADER = 'x-next-fetch-client-cache';
+const IF_NONE_MATCH_HEADER = 'if-none-match';
 
 const initializeRscRequestInterceptor = (): (() => void) => {
   const originalFetch = window.fetch;
@@ -24,10 +26,20 @@ const initializeRscRequestInterceptor = (): (() => void) => {
       return originalFetch(input, init);
     }
 
-    const cacheStateHeader = await createCacheStateHeader();
+    const [cacheStateHeader, ifNoneMatchHeader] = await Promise.all([
+      createCacheStateHeader(),
+      createIfNoneMatchHeader(),
+    ]);
 
     if (cacheStateHeader) {
       headers.set(CLIENT_CACHE_HEADER, cacheStateHeader);
+    }
+
+    if (ifNoneMatchHeader) {
+      headers.set(IF_NONE_MATCH_HEADER, ifNoneMatchHeader);
+    }
+
+    if (cacheStateHeader || ifNoneMatchHeader) {
       const modifiedInit = { ...init, headers };
       return originalFetch(input, modifiedInit);
     }
