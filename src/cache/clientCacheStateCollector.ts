@@ -27,6 +27,7 @@ export const collectValidCacheMetadata = async (): Promise<
       clientTags: entry.clientTags?.length ? entry.clientTags : undefined,
       serverTags: entry.serverTags?.length ? entry.serverTags : undefined,
       etag: entry.etag,
+      clientRevalidate: entry.clientRevalidate,
     } as ClientCacheMetadata;
   });
 

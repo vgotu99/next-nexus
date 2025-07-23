@@ -87,10 +87,7 @@ export interface HydrationData {
   };
 }
 
-export type ClientCacheMetadata = Omit<
-  CacheEntry,
-  'data' | 'createdAt' | 'clientRevalidate'
->;
+export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'>;
 
 export interface SerializedCacheState {
   metadata: ClientCacheMetadata[];
