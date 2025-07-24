@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "Axios-style HTTP client built on Fetch API for Next.js, with built-in server and client-side caching",
   "main": "index.ts",
+  "exports": {
+    "./revalidate": {
+      "react-server": "./src/revalidate/revalidateServer.ts",
+      "default": "./src/revalidate/revalidateClient.ts"
+    }
+  },
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
