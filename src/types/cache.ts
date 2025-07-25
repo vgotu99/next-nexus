@@ -6,7 +6,6 @@ export interface ServerCacheOptions {
 export interface ClientCacheOptions {
   revalidate?: number;
   tags?: string[];
-  shareServerTags?: boolean;
 }
 
 export interface CacheOptions {
@@ -28,31 +27,9 @@ export interface CacheEntry<T = unknown> {
 export interface CacheKeyOptions {
   endpoint: string;
   method?: string;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
   clientTags?: string[];
   serverTags?: string[];
-}
-
-export interface CacheInvalidationOptions {
-  tags?: string[];
-  path?: string;
-  scope?: CacheScope;
-}
-
-export interface CacheStorage<T = any> {
-  get(key: string): Promise<CacheEntry<T> | null>;
-  set(key: string, entry: CacheEntry<T>): Promise<void>;
-  delete(key: string): Promise<boolean>;
-  clear(): Promise<void>;
-  keys(): Promise<string[]>;
-  invalidateByTags(tags: string[]): Promise<void>;
-}
-
-export interface CacheManagerConfig {
-  maxSize?: number;
-  defaultTTL?: number;
-  storage?: CacheStorage;
-  debug?: boolean;
 }
 
 export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
@@ -66,16 +43,7 @@ export interface ClientCacheState {
   defaultTTL: number;
 }
 
-export type CacheScope = 'server+client' | 'serverOnly' | 'clientOnly';
-
 export type CacheRevalidateTime = number | false;
-
-export type CacheUtils = {
-  generateCacheKey: (options: CacheKeyOptions) => string;
-  isCacheEntryExpired: (entry: CacheEntry) => boolean;
-  calculateCacheTTL: (revalidate?: CacheRevalidateTime) => number;
-  normalizeCacheTags: (tags?: string[]) => string[];
-};
 
 export interface HydrationData {
   [cacheKey: string]: {

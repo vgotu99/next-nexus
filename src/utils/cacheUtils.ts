@@ -1,7 +1,6 @@
 import type {
   CacheKeyOptions,
   CacheEntry,
-  CacheUtils,
   CacheRevalidateTime,
 } from '@/types';
 import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
@@ -106,11 +105,4 @@ export const isValidCacheKey = (key: string): boolean => {
     return false;
   }
   return key.length <= 1000 && !key.includes('\n');
-};
-
-export const cacheUtils: CacheUtils = {
-  generateCacheKey,
-  isCacheEntryExpired,
-  calculateCacheTTL,
-  normalizeCacheTags,
 };
