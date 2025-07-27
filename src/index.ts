@@ -4,3 +4,4 @@ export default nextFetch;
 export * from './types';
 export * from './errors/NextFetchError';
 export * from './providers';
+export { revalidateServerTags } from './revalidate/revalidateServerTags';
