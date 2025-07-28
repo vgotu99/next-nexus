@@ -1,4 +1,5 @@
-import type { NextFetchRequestConfig } from '@/types';
+import type { NextFetchRequestConfig } from '@/types/request';
+import { createNextFetchDefinition } from '@/utils/definitionUtils';
 
 import { createNextFetchInstance } from '../client';
 
@@ -27,16 +28,6 @@ jest.mock('../interceptor', () => ({
   })),
 }));
 
-jest.mock('../methods', () => ({
-  createMethods: jest.fn(() => ({
-    get: jest.fn(),
-    post: jest.fn(),
-    put: jest.fn(),
-    patch: jest.fn(),
-    delete: jest.fn(),
-  })),
-}));
-
 describe('createNextFetchInstance', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -46,13 +37,8 @@ describe('createNextFetchInstance', () => {
     const instance = createNextFetchInstance();
 
     expect(instance).toBeDefined();
-    expect(typeof instance).toBe('object');
+    expect(typeof instance).toBe('function');
     expect(instance.interceptors).toBeDefined();
-    expect(instance.get).toBeDefined();
-    expect(instance.post).toBeDefined();
-    expect(instance.put).toBeDefined();
-    expect(instance.patch).toBeDefined();
-    expect(instance.delete).toBeDefined();
   });
 
   it('should create instance with custom config', () => {
@@ -65,7 +51,7 @@ describe('createNextFetchInstance', () => {
     const instance = createNextFetchInstance(config);
 
     expect(instance).toBeDefined();
-    expect(typeof instance).toBe('object');
+    expect(typeof instance).toBe('function');
     expect(instance.interceptors).toBeDefined();
   });
 
@@ -81,20 +67,31 @@ describe('createNextFetchInstance', () => {
     expect(typeof instance.interceptors.response.remove).toBe('function');
   });
 
-  it('should have HTTP method shortcuts', () => {
+  it('should accept NextFetchDefinition and return typed response', async () => {
     const instance = createNextFetchInstance();
 
-    expect(typeof instance.get).toBe('function');
-    expect(typeof instance.post).toBe('function');
-    expect(typeof instance.put).toBe('function');
-    expect(typeof instance.patch).toBe('function');
-    expect(typeof instance.delete).toBe('function');
+    const apiDefinition = createNextFetchDefinition<{
+      name: string;
+      price: number;
+    }>({
+      method: 'GET',
+      endpoint: '/products',
+    });
+
+    const response = await instance(apiDefinition);
+
+    expect(typeof instance).toBe('function');
+    expect(instance).toBeDefined();
+    expect(response).toBeDefined();
+    expect(response.data).toBeDefined();
+    expect(response.data?.name).toBe('Product 1');
+    expect(response.data?.price).toBe(100);
   });
 
   it('should work without configuration', () => {
     const instance = createNextFetchInstance();
 
     expect(instance).toBeDefined();
-    expect(typeof instance).toBe('object');
+    expect(typeof instance).toBe('function');
   });
 });

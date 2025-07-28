@@ -13,6 +13,7 @@ import type {
   NextFetchResponse,
   ServerCacheOptions,
 } from '@/types';
+import type { NextFetchDefinition } from '@/types/definition';
 import type {
   InternalNextFetchRequestConfig,
   InternalNextFetchResponse,
@@ -32,7 +33,6 @@ import {
   createRequestInterceptor,
   createResponseInterceptor,
 } from './interceptor';
-import { createMethods } from './methods';
 
 const transformServerOptionsToNextOptions = (
   server?: ServerCacheOptions
@@ -175,11 +175,7 @@ const executeRequestWithLifecycle = async <T>(
   const request = new Request(url, modifiedConfig);
   const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
 
-  if (
-    isServerEnvironment() &&
-    response.data &&
-    modifiedConfig.headers
-  ) {
+  if (isServerEnvironment() && response.data && modifiedConfig.headers) {
     const headers = new Headers(modifiedConfig.headers);
     const clientCacheMetadata = extractClientCacheStateFromHeaders(headers);
 
@@ -254,14 +250,19 @@ export const createNextFetchInstance = (
   const responseInterceptor = createResponseInterceptor();
 
   const nextFetch = async <T>(
-    endpoint: string,
-    config: NextFetchRequestConfig & NextFetchInterceptorOptions = {}
+    definition: NextFetchDefinition<T>
   ): Promise<NextFetchResponse<T>> => {
-    const { interceptors, ...restConfig } = config;
+    const { method, endpoint, options = {} } = definition;
+    const { interceptors, ...restConfig } = options as NextFetchRequestConfig &
+      NextFetchInterceptorOptions;
     const url = `${baseURL}${endpoint}`;
 
     const requestConfig = buildRequestConfig(
-      restConfig,
+      {
+        ...restConfig,
+        method,
+        body: definition.data ? JSON.stringify(definition.data) : undefined,
+      },
       defaultHeaders,
       defaultTimeout,
       restDefaultConfig
@@ -276,7 +277,7 @@ export const createNextFetchInstance = (
     )) as NextFetchResponse<T>;
   };
 
-  const instance = createMethods(nextFetch);
+  const instance = nextFetch as NextFetchInstance;
   instance.interceptors = createInterceptorInterface(
     requestInterceptor,
     responseInterceptor
