@@ -61,7 +61,11 @@ const initializeRscRequestInterceptor = (): (() => void) => {
   };
 };
 
-export const ClientProvider = ({ children }: { children: ReactNode }) => {
+const NextFetchClientInitializer = ({
+  children,
+}: {
+  children: ReactNode;
+}) => {
   useEffect(() => {
     const cleanup = initializeRscRequestInterceptor();
 
@@ -70,3 +74,5 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
 
   return <>{children}</>;
 };
+
+export default NextFetchClientInitializer;
