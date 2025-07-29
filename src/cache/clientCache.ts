@@ -20,6 +20,45 @@ const clientCacheState: ClientCacheState = {
   defaultTTL: 3 * 60 * 1000,
 };
 
+const listeners = new Map<string, Set<() => void>>();
+
+const notify = (cacheKey: string): void => {
+  const keyListeners = listeners.get(cacheKey);
+  if (!keyListeners) return;
+
+  keyListeners.forEach(callback => {
+    try {
+      callback();
+    } catch (error) {
+      console.error('[next-fetch] Error in cache listener:', error);
+    }
+  });
+};
+
+const subscribe = (cacheKey: string, callback: () => void): (() => void) => {
+  if (!isClientEnvironment()) {
+    return () => {};
+  }
+
+  if (!listeners.has(cacheKey)) {
+    listeners.set(cacheKey, new Set());
+  }
+
+  const keyListeners = listeners.get(cacheKey)!;
+  keyListeners.add(callback);
+
+  return () => {
+    const keyListeners = listeners.get(cacheKey);
+    if (!keyListeners) return;
+
+    keyListeners.delete(callback);
+
+    if (keyListeners.size === 0) {
+      listeners.delete(cacheKey);
+    }
+  };
+};
+
 const createClientCacheEntry = <T>(
   data: T,
   key: string,
@@ -127,6 +166,7 @@ const get = async <T = unknown>(
 
   if (isCacheEntryExpired(entry)) {
     clientCacheState.clientCache.delete(key);
+    notify(key);
 
     return null;
   }
@@ -158,6 +198,7 @@ const set = async <T = unknown>(
   }
 
   clientCacheState.clientCache.set(key, entry);
+  notify(key);
 };
 
 const setWithTTL = async <T = unknown>(
@@ -192,7 +233,12 @@ const deleteKey = async (key: string): Promise<boolean> => {
     return false;
   }
 
-  return clientCacheState.clientCache.delete(key);
+  const deleted = clientCacheState.clientCache.delete(key);
+  if (deleted) {
+    notify(key);
+  }
+
+  return deleted;
 };
 
 const clear = async (): Promise<void> => {
@@ -200,7 +246,11 @@ const clear = async (): Promise<void> => {
     return;
   }
 
+  const keysToNotify = Array.from(clientCacheState.clientCache.keys());
+
   clientCacheState.clientCache.clear();
+
+  keysToNotify.forEach(key => notify(key));
 };
 
 const keys = async (): Promise<string[]> => {
@@ -234,7 +284,12 @@ const invalidateByTags = async (tags: string[]): Promise<void> => {
   }
 
   const keysToDelete = filterByTags(clientCacheState.clientCache, tags);
+
+  const keysToNotify = [...keysToDelete];
+
   keysToDelete.forEach(key => clientCacheState.clientCache.delete(key));
+
+  keysToNotify.forEach(key => notify(key));
 };
 
 const cleanup = async (): Promise<number> => {
@@ -243,9 +298,16 @@ const cleanup = async (): Promise<number> => {
   }
 
   const originalSize = clientCacheState.clientCache.size;
+
+  const expiredKeys = Array.from(clientCacheState.clientCache.entries())
+    .filter(([, entry]) => isCacheEntryExpired(entry))
+    .map(([key]) => key);
+
   clientCacheState.clientCache = filterExpiredEntries(
     clientCacheState.clientCache
   );
+
+  expiredKeys.forEach(key => notify(key));
 
   return originalSize - clientCacheState.clientCache.size;
 };
@@ -283,4 +345,5 @@ export const clientCache = {
   invalidateByTags,
   cleanup,
   getStats,
+  subscribe,
 };
