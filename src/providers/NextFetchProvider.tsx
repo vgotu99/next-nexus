@@ -5,7 +5,10 @@ import {
   extractClientCacheStateFromHeaders,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
+import { NextFetchContext } from '@/context/NextFetchContext';
+import nextFetch from '@/core';
 import type { CacheEntry, HydrationData } from '@/types/cache';
+import type { NextFetchInstance } from '@/types/instance';
 import { getCurrentTimestamp, isServerEnvironment } from '@/utils';
 
 import CacheHydrator from './CacheHydrator';
@@ -13,7 +16,10 @@ import { ClientProvider } from './ClientProvider';
 
 interface NextFetchProviderProps {
   children: ReactNode;
+  instance?: NextFetchInstance;
 }
+
+type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'instance'>;
 
 const generateHydrationScript = (data: HydrationData): string => {
   const serializedData = JSON.stringify(data);
@@ -86,7 +92,7 @@ const createHydrationScript = (hydrationData: HydrationData): ReactNode => {
 
 const ServerNextFetchProvider = async ({
   children,
-}: NextFetchProviderProps) => {
+}: ServerNextFetchProviderProps) => {
   const content = await requestCache.runWith(async () => {
     const renderedChildren = <>{children}</>;
 
@@ -104,17 +110,31 @@ const ServerNextFetchProvider = async ({
   return content;
 };
 
-const ClientNextFetchProvider = ({ children }: NextFetchProviderProps) => (
-  <ClientProvider>
-    <CacheHydrator />
-    {children}
-  </ClientProvider>
-);
+const ClientNextFetchProvider = ({
+  children,
+  instance,
+}: NextFetchProviderProps) => {
+  const defaultNextFetchInstance = instance || nextFetch.create();
 
-export const NextFetchProvider = ({ children }: NextFetchProviderProps) => {
+  return (
+    <NextFetchContext.Provider value={{ instance: defaultNextFetchInstance }}>
+      <ClientProvider>
+        <CacheHydrator />
+        {children}
+      </ClientProvider>
+    </NextFetchContext.Provider>
+  );
+};
+
+export const NextFetchProvider = ({
+  children,
+  instance,
+}: NextFetchProviderProps) => {
   return isServerEnvironment() ? (
     <ServerNextFetchProvider>{children}</ServerNextFetchProvider>
   ) : (
-    <ClientNextFetchProvider>{children}</ClientNextFetchProvider>
+    <ClientNextFetchProvider instance={instance}>
+      {children}
+    </ClientNextFetchProvider>
   );
 };
