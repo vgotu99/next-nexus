@@ -1,4 +1,4 @@
-import { clientCache } from '@/cache/clientCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import { isCacheEntryExpired } from '@/utils/cacheUtils';
 import { isClientEnvironment, isDevelopment } from '@/utils/environmentUtils';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
@@ -48,7 +48,7 @@ export const extendCacheLifecycle = async (
 
   try {
     const { cacheKey, extensionTTL, reason } = options;
-    const entry = await clientCache.get(cacheKey);
+    const entry = await clientCacheStore.get(cacheKey);
 
     if (!entry) {
       console.warn(`[next-fetch] Cache entry not found for key: ${cacheKey}`);
@@ -68,7 +68,7 @@ export const extendCacheLifecycle = async (
       lastAccessed: now,
     };
 
-    await clientCache.set(cacheKey, extendedEntry);
+    await clientCacheStore.set(cacheKey, extendedEntry);
 
     if (isDevelopment()) {
       console.log(

@@ -10,7 +10,7 @@ import { getCurrentTimestamp } from '@/utils/timeUtils';
 
 declare global {
   interface Window {
-    __nextFetchClientCache?: typeof clientCache;
+    __nextFetchClientCache?: typeof clientCacheStore;
   }
 }
 
@@ -329,7 +329,7 @@ const getStats = async () => {
   };
 };
 
-export const clientCache = {
+export const clientCacheStore = {
   get,
   set,
   setWithTTL,

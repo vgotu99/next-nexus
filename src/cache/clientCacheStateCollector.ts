@@ -1,4 +1,4 @@
-import { clientCache } from '@/cache/clientCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import type { ClientCacheMetadata, SerializedCacheState } from '@/types/cache';
 import { isCacheEntryExpired } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
@@ -12,10 +12,10 @@ export const collectValidCacheMetadata = async (): Promise<
     return [];
   }
 
-  const cacheKeys = await clientCache.keys();
+  const cacheKeys = await clientCacheStore.keys();
 
   const metadataPromises = cacheKeys.map(async key => {
-    const entry = await clientCache.get<unknown>(key);
+    const entry = await clientCacheStore.get<unknown>(key);
 
     if (!entry || isCacheEntryExpired(entry)) {
       return null;
@@ -86,7 +86,7 @@ export const hasValidCacheEntriesByCacheKeys = async (
   }
 
   const checkPromises = cacheKeys.map(async key => {
-    const entry = await clientCache.get(key);
+    const entry = await clientCacheStore.get(key);
     return entry !== null && !isCacheEntryExpired(entry);
   });
 

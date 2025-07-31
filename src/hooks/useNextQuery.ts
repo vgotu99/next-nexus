@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
-import { clientCache } from '@/cache/clientCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import { useNextFetchContext } from '@/context/NextFetchContext';
 import type { GetNextFetchDefinition } from '@/types/definition';
 import type {
@@ -85,7 +85,7 @@ const fetchData = async <TData>(
 
   const { data } = await nextFetchInstance(definition);
 
-  await clientCache.setWithTTL(
+  await clientCacheStore.setWithTTL(
     cacheKey,
     data,
     options?.client?.revalidate,
@@ -160,7 +160,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
   const syncStateWithCache = useCallback(async (): Promise<void> => {
     if (!enabled) return;
 
-    const cachedEntry = await clientCache.get(cacheKey);
+    const cachedEntry = await clientCacheStore.get(cacheKey);
 
     if (cachedEntry) {
       const selectedData = select
@@ -177,7 +177,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
 
     await syncStateWithCache();
 
-    const cachedEntry = await clientCache.get(cacheKey);
+    const cachedEntry = await clientCacheStore.get(cacheKey);
 
     if (!cachedEntry || isCacheEntryExpired(cachedEntry)) {
       refetch();
@@ -196,7 +196,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
   useEffect(() => {
     if (!enabled) return;
 
-    const unsubscribe = clientCache.subscribe(cacheKey, syncStateWithCache);
+    const unsubscribe = clientCacheStore.subscribe(cacheKey, syncStateWithCache);
 
     return unsubscribe;
   }, [cacheKey, enabled, syncStateWithCache]);

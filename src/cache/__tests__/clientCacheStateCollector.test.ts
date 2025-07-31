@@ -1,4 +1,3 @@
-import { clientCache } from '@/cache/clientCache';
 import {
   collectValidCacheMetadata,
   serializeCacheState,
@@ -6,15 +5,17 @@ import {
   createCacheStateHeader,
   hasValidCacheEntriesByCacheKeys,
 } from '@/cache/clientCacheStateCollector';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import { isCacheEntryExpired } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
 
-// Mocks
-jest.mock('@/cache/clientCache');
+jest.mock('@/cache/clientCacheStore');
 jest.mock('@/utils/environmentUtils');
 jest.mock('@/utils/cacheUtils');
 
-const mockClientCache = clientCache as jest.Mocked<typeof clientCache>;
+const mockClientCache = clientCacheStore as jest.Mocked<
+  typeof clientCacheStore
+>;
 const mockIsClientEnvironment = isClientEnvironment as jest.MockedFunction<
   typeof isClientEnvironment
 >;

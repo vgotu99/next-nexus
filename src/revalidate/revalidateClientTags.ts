@@ -1,7 +1,7 @@
 'use client';
 
-import { clientCache } from '@/cache/clientCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 
 export const revalidateClientTags = async (tags: string[]): Promise<void> => {
-  await clientCache.revalidateByTags(tags);
+  await clientCacheStore.revalidateByTags(tags);
 };

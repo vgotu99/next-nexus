@@ -1,5 +1,5 @@
-import { clientCache } from '@/cache/clientCache';
 import { handleNotModifiedResponse } from '@/cache/clientCacheLifecycleExtender';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import { createConditionalResponse } from '@/cache/serverETagValidator';
 import type { ClientCacheMetadata } from '@/types/cache';
 import { generateETag } from '@/utils/cacheUtils';
@@ -8,10 +8,12 @@ import {
   isServerEnvironment,
 } from '@/utils/environmentUtils';
 
-jest.mock('@/cache/clientCache');
+jest.mock('@/cache/clientCacheStore');
 jest.mock('@/utils/environmentUtils');
 
-const mockClientCache = clientCache as jest.Mocked<typeof clientCache>;
+const mockClientCache = clientCacheStore as jest.Mocked<
+  typeof clientCacheStore
+>;
 const mockIsClientEnvironment = isClientEnvironment as jest.MockedFunction<
   typeof isClientEnvironment
 >;

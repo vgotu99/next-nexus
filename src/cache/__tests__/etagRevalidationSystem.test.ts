@@ -1,9 +1,9 @@
-import { clientCache } from '@/cache/clientCache';
 import {
   parseCacheRevalidationHeader,
   extendCacheLifecycle,
   handleNotModifiedResponse,
 } from '@/cache/clientCacheLifecycleExtender';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import {
   collectExpiredCacheETags,
   createIfNoneMatchHeader,
@@ -21,10 +21,12 @@ import {
   isServerEnvironment,
 } from '@/utils/environmentUtils';
 
-jest.mock('@/cache/clientCache');
+jest.mock('@/cache/clientCacheStore');
 jest.mock('@/utils/environmentUtils');
 
-const mockClientCache = clientCache as jest.Mocked<typeof clientCache>;
+const mockClientCache = clientCacheStore as jest.Mocked<
+  typeof clientCacheStore
+>;
 const mockIsClientEnvironment = isClientEnvironment as jest.MockedFunction<
   typeof isClientEnvironment
 >;

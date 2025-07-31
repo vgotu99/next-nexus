@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-import { clientCache } from '@/cache/clientCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import type { HydrationData } from '@/types/cache';
 import { isClientEnvironment, isDevelopment } from '@/utils/environmentUtils';
 
@@ -52,7 +52,7 @@ const hydrateClientCache = async (
 
     const hydrationPromises = entries.map(
       async ({ key, data, clientRevalidate, clientTags, serverTags }) => {
-        await clientCache.setWithTTL(
+        await clientCacheStore.setWithTTL(
           key,
           data,
           clientRevalidate,
@@ -82,7 +82,7 @@ const setupDevelopmentDebug = (): void => {
   const canSetupDebug = isClientEnvironment() && isDevelopment();
 
   if (canSetupDebug) {
-    window.__nextFetchClientCache = clientCache;
+    window.__nextFetchClientCache = clientCacheStore;
   }
 };
 

@@ -1,4 +1,4 @@
-import { clientCache } from '@/cache/clientCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import { isCacheEntryExpired } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
 
@@ -17,10 +17,10 @@ export const collectExpiredCacheETags = async (): Promise<
     return [];
   }
 
-  const cacheKeys = await clientCache.keys();
+  const cacheKeys = await clientCacheStore.keys();
 
   const etagPromises = cacheKeys.map(async key => {
-    const entry = await clientCache.get<unknown>(key);
+    const entry = await clientCacheStore.get<unknown>(key);
 
     if (!entry) {
       return null;
@@ -40,7 +40,7 @@ export const collectExpiredCacheETags = async (): Promise<
   const resolvedETags = await Promise.all(etagPromises);
 
   return resolvedETags.filter(
-    (entry): entry is ExpiredCacheETagEntry => entry !== null,
+    (entry): entry is ExpiredCacheETagEntry => entry !== null
   );
 };
 
@@ -61,13 +61,13 @@ export const serializeETagsForHeader = (etags: string[]): string => {
       }
       return { header: newHeader, truncated: false };
     },
-    { header: '', truncated: false },
+    { header: '', truncated: false }
   );
 
   if (truncated) {
     const fullHeaderLength = etags.join(', ').length;
     console.warn(
-      `ETag header exceeds size limit (${fullHeaderLength} > ${MAX_ETAG_HEADER_SIZE}). Truncating...`,
+      `ETag header exceeds size limit (${fullHeaderLength} > ${MAX_ETAG_HEADER_SIZE}). Truncating...`
     );
   }
 
@@ -93,14 +93,14 @@ export const createIfNoneMatchHeader = async (): Promise<string | null> => {
 };
 
 export const getExpiredETagByCacheKey = async (
-  cacheKey: string,
+  cacheKey: string
 ): Promise<string | null> => {
   if (!isClientEnvironment()) {
     return null;
   }
 
   try {
-    const entry = await clientCache.get(cacheKey);
+    const entry = await clientCacheStore.get(cacheKey);
 
     if (!entry || !entry.etag) {
       return null;
@@ -110,7 +110,7 @@ export const getExpiredETagByCacheKey = async (
   } catch (error) {
     console.warn(
       `[next-fetch] Failed to get expired ETag for key ${cacheKey}:`,
-      error,
+      error
     );
     return null;
   }
