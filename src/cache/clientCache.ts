@@ -278,18 +278,14 @@ const size = async (): Promise<number> => {
   return clientCacheState.clientCache.size;
 };
 
-const invalidateByTags = async (tags: string[]): Promise<void> => {
+const revalidateByTags = async (tags: string[]): Promise<void> => {
   if (!isClientEnvironment() || !tags.length) {
     return;
   }
 
   const keysToDelete = filterByTags(clientCacheState.clientCache, tags);
 
-  const keysToNotify = [...keysToDelete];
-
-  keysToDelete.forEach(key => clientCacheState.clientCache.delete(key));
-
-  keysToNotify.forEach(key => notify(key));
+  await Promise.all(keysToDelete.map(key => deleteKey(key)));
 };
 
 const cleanup = async (): Promise<number> => {
@@ -342,7 +338,7 @@ export const clientCache = {
   keys,
   has,
   size,
-  invalidateByTags,
+  revalidateByTags,
   cleanup,
   getStats,
   subscribe,
