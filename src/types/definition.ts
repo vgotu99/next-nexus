@@ -53,6 +53,11 @@ export interface CreateNextFetchDefinitionConfig {
   options?: NextFetchRequestConfig;
 }
 
-export type CreateNextFetchDefinition = <TResponse = unknown>(
-  config: CreateNextFetchDefinitionConfig
-) => NextFetchDefinition<TResponse>;
+export type MutationDefinition<TResponse = unknown, TVariables = unknown> = (
+  | PostNextFetchDefinition<TResponse>
+  | PutNextFetchDefinition<TResponse>
+  | PatchNextFetchDefinition<TResponse>
+  | DeleteNextFetchDefinition<TResponse>
+) & {
+  readonly _phantomVariables?: TVariables;
+};
