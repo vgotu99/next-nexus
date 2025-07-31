@@ -71,8 +71,9 @@ export const isMutationDefinition = <TResponse>(
 ): definition is
   | PostNextFetchDefinition<TResponse>
   | PutNextFetchDefinition<TResponse>
-  | PatchNextFetchDefinition<TResponse> => {
-  return ['POST', 'PUT', 'PATCH'].includes(definition.method);
+  | PatchNextFetchDefinition<TResponse>
+  | DeleteNextFetchDefinition<TResponse> => {
+  return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(definition.method);
 };
 
 export const resolveDefinitionEndpoint = <TResponse>(
