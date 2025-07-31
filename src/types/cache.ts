@@ -61,3 +61,12 @@ export interface SerializedCacheState {
   metadata: ClientCacheMetadata[];
   timestamp: number;
 }
+
+export interface CacheHandler<TData = unknown> {
+  get(): TData | undefined;
+  set(updater: (oldData: TData | undefined) => TData): void;
+  remove(): void;
+  invalidate(): void;
+  isStale(): boolean;
+  subscribe(callback: (data: TData | undefined) => void): () => void;
+}
