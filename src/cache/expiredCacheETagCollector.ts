@@ -10,38 +10,26 @@ export interface ExpiredCacheETagEntry {
 
 const MAX_ETAG_HEADER_SIZE = 4096;
 
-export const collectExpiredCacheETags = async (): Promise<
-  ExpiredCacheETagEntry[]
-> => {
+export const collectExpiredCacheETags = (): ExpiredCacheETagEntry[] => {
   if (!isClientEnvironment()) {
     return [];
   }
 
-  const cacheKeys = await clientCacheStore.keys();
+  const cacheKeys = clientCacheStore.keys();
 
-  const etagPromises = cacheKeys.map(async key => {
-    const entry = await clientCacheStore.get<unknown>(key);
-
-    if (!entry) {
+  return cacheKeys
+    .map(key => {
+      const entry = clientCacheStore.get<unknown>(key);
+      if (entry && isCacheEntryExpired(entry) && entry.etag) {
+        return {
+          cacheKey: entry.key,
+          etag: entry.etag,
+          originalTTL: entry.clientRevalidate,
+        } as ExpiredCacheETagEntry;
+      }
       return null;
-    }
-
-    if (isCacheEntryExpired(entry) && entry.etag) {
-      return {
-        cacheKey: entry.key,
-        etag: entry.etag,
-        originalTTL: entry.clientRevalidate,
-      } as ExpiredCacheETagEntry;
-    }
-
-    return null;
-  });
-
-  const resolvedETags = await Promise.all(etagPromises);
-
-  return resolvedETags.filter(
-    (entry): entry is ExpiredCacheETagEntry => entry !== null
-  );
+    })
+    .filter((entry): entry is ExpiredCacheETagEntry => entry !== null);
 };
 
 export const serializeETagsForHeader = (etags: string[]): string => {
@@ -74,9 +62,9 @@ export const serializeETagsForHeader = (etags: string[]): string => {
   return finalHeader;
 };
 
-export const createIfNoneMatchHeader = async (): Promise<string | null> => {
+export const createIfNoneMatchHeader = (): string | null => {
   try {
-    const expiredETags = await collectExpiredCacheETags();
+    const expiredETags = collectExpiredCacheETags();
 
     if (expiredETags.length === 0) {
       return null;
@@ -92,15 +80,15 @@ export const createIfNoneMatchHeader = async (): Promise<string | null> => {
   }
 };
 
-export const getExpiredETagByCacheKey = async (
-  cacheKey: string
-): Promise<string | null> => {
+export const getExpiredETagByCacheKey = (
+  cacheKey: string,
+): string | null => {
   if (!isClientEnvironment()) {
     return null;
   }
 
   try {
-    const entry = await clientCacheStore.get(cacheKey);
+    const entry = clientCacheStore.get(cacheKey);
 
     if (!entry || !entry.etag) {
       return null;
@@ -110,17 +98,15 @@ export const getExpiredETagByCacheKey = async (
   } catch (error) {
     console.warn(
       `[next-fetch] Failed to get expired ETag for key ${cacheKey}:`,
-      error
+      error,
     );
     return null;
   }
 };
 
-export const getExpiredCacheKeyToETagMap = async (): Promise<
-  Map<string, string>
-> => {
+export const getExpiredCacheKeyToETagMap = (): Map<string, string> => {
   try {
-    const expiredETags = await collectExpiredCacheETags();
+    const expiredETags = collectExpiredCacheETags();
     const etagMap = new Map<string, string>();
 
     expiredETags.forEach(({ cacheKey, etag }) => {

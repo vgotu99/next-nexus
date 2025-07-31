@@ -42,17 +42,15 @@ const createHydrationEntry = (key: string, value: HydrationData[string]) => ({
   serverTags: value.serverTags,
 });
 
-const hydrateClientCache = async (
-  hydrationData: HydrationData
-): Promise<number> => {
+const hydrateClientCache = (hydrationData: HydrationData): number => {
   try {
     const entries = Object.entries(hydrationData).map(([key, value]) =>
       createHydrationEntry(key, value)
     );
 
-    const hydrationPromises = entries.map(
-      async ({ key, data, clientRevalidate, clientTags, serverTags }) => {
-        await clientCacheStore.setWithTTL(
+    entries.forEach(
+      ({ key, data, clientRevalidate, clientTags, serverTags }) => {
+        clientCacheStore.setWithTTL(
           key,
           data,
           clientRevalidate,
@@ -60,12 +58,10 @@ const hydrateClientCache = async (
           serverTags,
           'hydration'
         );
-        return key;
       }
     );
 
-    const hydratedKeys = await Promise.all(hydrationPromises);
-    return hydratedKeys.length;
+    return entries.length;
   } catch (error) {
     return 0;
   }
@@ -86,13 +82,13 @@ const setupDevelopmentDebug = (): void => {
   }
 };
 
-const performHydration = async (): Promise<void> => {
+const performHydration = (): void => {
   if (!isClientEnvironment()) return;
 
   const hydrationData = getHydrationData();
   if (!hydrationData) return;
 
-  const hydratedCount = await hydrateClientCache(hydrationData);
+  const hydratedCount = hydrateClientCache(hydrationData);
 
   logHydrationResult(hydratedCount);
   cleanupHydrationResources();

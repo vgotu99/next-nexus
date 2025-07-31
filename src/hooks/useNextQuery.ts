@@ -85,7 +85,7 @@ const fetchData = async <TData>(
 
   const { data } = await nextFetchInstance(definition);
 
-  await clientCacheStore.setWithTTL(
+  clientCacheStore.setWithTTL(
     cacheKey,
     data,
     options?.client?.revalidate,
@@ -157,27 +157,27 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     }
   }, [definition, cacheKey, enabled, select, nextFetchInstance]);
 
-  const syncStateWithCache = useCallback(async (): Promise<void> => {
+  const syncStateWithCache = useCallback((): void => {
     if (!enabled) return;
 
-    const cachedEntry = await clientCacheStore.get(cacheKey);
+    const cachedEntry = clientCacheStore.get<TData>(cacheKey);
 
     if (cachedEntry) {
-      const selectedData = select
-        ? select(cachedEntry.data as TData)
-        : (cachedEntry.data as TSelectedData);
-      dispatch({ type: 'SET_DATA', payload: selectedData });
+      const dataToDispatch = select
+        ? select(cachedEntry.data)
+        : (cachedEntry.data as unknown as TSelectedData);
+      dispatch({ type: 'SET_DATA', payload: dataToDispatch });
     } else {
       dispatch({ type: 'RESET' });
     }
   }, [cacheKey, enabled, select]);
 
-  const initializeQuery = useCallback(async (): Promise<void> => {
+  const initializeQuery = useCallback((): void => {
     if (!enabled) return;
 
-    await syncStateWithCache();
+    syncStateWithCache();
 
-    const cachedEntry = await clientCacheStore.get(cacheKey);
+    const cachedEntry = clientCacheStore.get<TData>(cacheKey);
 
     if (!cachedEntry || isCacheEntryExpired(cachedEntry)) {
       refetch();

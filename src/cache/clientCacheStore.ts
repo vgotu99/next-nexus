@@ -36,9 +36,7 @@ const notify = (cacheKey: string): void => {
 };
 
 const subscribe = (cacheKey: string, callback: () => void): (() => void) => {
-  if (!isClientEnvironment()) {
-    return () => {};
-  }
+  if (!isClientEnvironment()) return () => {};
 
   if (!listeners.has(cacheKey)) {
     listeners.set(cacheKey, new Set());
@@ -68,6 +66,7 @@ const createClientCacheEntry = <T>(
   source: ClientCacheEntry['source'] = 'manual'
 ): ClientCacheEntry<T> => {
   const baseEntry = createCacheEntry(data, key, ttl, clientTags, serverTags);
+
   return {
     ...baseEntry,
     source,
@@ -150,19 +149,14 @@ const calculateStats = (clientCache: Map<string, ClientCacheEntry>) => {
   );
 };
 
-const get = async <T = unknown>(
-  key: string
-): Promise<ClientCacheEntry<T> | null> => {
-  if (!isClientEnvironment()) {
-    return null;
-  }
+const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
+  if (!isClientEnvironment()) return null;
 
   const entry = clientCacheState.clientCache.get(key) as
     | ClientCacheEntry<T>
     | undefined;
-  if (!entry) {
-    return null;
-  }
+
+  if (!entry) return null;
 
   if (isCacheEntryExpired(entry)) {
     clientCacheState.clientCache.delete(key);
@@ -177,13 +171,8 @@ const get = async <T = unknown>(
   return updatedEntry;
 };
 
-const set = async <T = unknown>(
-  key: string,
-  entry: ClientCacheEntry<T>
-): Promise<void> => {
-  if (!isClientEnvironment()) {
-    return;
-  }
+const set = <T = unknown>(key: string, entry: ClientCacheEntry<T>): void => {
+  if (!isClientEnvironment()) return;
 
   const lruKey = shouldDelete(
     clientCacheState.clientCache,
@@ -201,17 +190,15 @@ const set = async <T = unknown>(
   notify(key);
 };
 
-const setWithTTL = async <T = unknown>(
+const setWithTTL = <T = unknown>(
   key: string,
   data: T,
   clientRevalidate?: number,
   clientTags?: string[],
   serverTags?: string[],
   source: ClientCacheEntry['source'] = 'fetch'
-): Promise<void> => {
-  if (!isClientEnvironment()) {
-    return;
-  }
+): void => {
+  if (!isClientEnvironment()) return;
 
   const ttl = clientRevalidate
     ? clientRevalidate * 1000
@@ -225,90 +212,63 @@ const setWithTTL = async <T = unknown>(
     source
   );
 
-  await set(key, entry);
+  set(key, entry);
 };
 
-const deleteKey = async (key: string): Promise<boolean> => {
-  if (!isClientEnvironment()) {
-    return false;
-  }
+const deleteKey = (key: string): boolean => {
+  if (!isClientEnvironment()) return false;
 
   const deleted = clientCacheState.clientCache.delete(key);
-  if (deleted) {
-    notify(key);
-  }
+  if (deleted) notify(key);
 
   return deleted;
 };
 
-const clear = async (): Promise<void> => {
-  if (!isClientEnvironment()) {
-    return;
-  }
-
-  const keysToNotify = Array.from(clientCacheState.clientCache.keys());
+const clear = (): void => {
+  if (!isClientEnvironment()) return;
 
   clientCacheState.clientCache.clear();
-
-  keysToNotify.forEach(key => notify(key));
 };
 
-const keys = async (): Promise<string[]> => {
-  if (!isClientEnvironment()) {
-    return [];
-  }
+const keys = (): string[] => {
+  if (!isClientEnvironment()) return [];
 
   return Array.from(clientCacheState.clientCache.keys());
 };
 
-const has = async (key: string): Promise<boolean> => {
-  if (!isClientEnvironment()) {
-    return false;
-  }
+const has = (key: string): boolean => {
+  if (!isClientEnvironment()) return false;
 
-  const entry = await get(key);
+  const entry = get(key);
   return entry !== null;
 };
 
-const size = async (): Promise<number> => {
-  if (!isClientEnvironment()) {
-    return 0;
-  }
+const size = (): number => {
+  if (!isClientEnvironment()) return 0;
 
   return clientCacheState.clientCache.size;
 };
 
-const revalidateByTags = async (tags: string[]): Promise<void> => {
-  if (!isClientEnvironment() || !tags.length) {
-    return;
-  }
+const revalidateByTags = (tags: string[]): void => {
+  if (!isClientEnvironment() || !tags.length) return;
 
   const keysToDelete = filterByTags(clientCacheState.clientCache, tags);
 
-  await Promise.all(keysToDelete.map(key => deleteKey(key)));
+  keysToDelete.forEach(key => deleteKey(key));
 };
 
-const cleanup = async (): Promise<number> => {
-  if (!isClientEnvironment()) {
-    return 0;
-  }
+const cleanup = (): number => {
+  if (!isClientEnvironment()) return 0;
 
   const originalSize = clientCacheState.clientCache.size;
-
-  const expiredKeys = Array.from(clientCacheState.clientCache.entries())
-    .filter(([, entry]) => isCacheEntryExpired(entry))
-    .map(([key]) => key);
-
   clientCacheState.clientCache = filterExpiredEntries(
     clientCacheState.clientCache
   );
 
-  expiredKeys.forEach(key => notify(key));
-
   return originalSize - clientCacheState.clientCache.size;
 };
 
-const getStats = async () => {
+const getStats = () => {
   const defaultStats = {
     size: 0,
     maxSize: clientCacheState.maxSize,
@@ -316,9 +276,7 @@ const getStats = async () => {
     bySource: { fetch: 0, hydration: 0, manual: 0 },
   };
 
-  if (!isClientEnvironment()) {
-    return defaultStats;
-  }
+  if (!isClientEnvironment()) return defaultStats;
 
   const stats = calculateStats(clientCacheState.clientCache);
 

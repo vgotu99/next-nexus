@@ -26,10 +26,8 @@ const initializeRscRequestInterceptor = (): (() => void) => {
       return originalFetch(input, init);
     }
 
-    const [cacheStateHeader, ifNoneMatchHeader] = await Promise.all([
-      createCacheStateHeader(),
-      createIfNoneMatchHeader(),
-    ]);
+    const cacheStateHeader = createCacheStateHeader();
+    const ifNoneMatchHeader = createIfNoneMatchHeader();
 
     if (cacheStateHeader) {
       headers.set(CLIENT_CACHE_HEADER, cacheStateHeader);

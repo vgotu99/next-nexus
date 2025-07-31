@@ -1,4 +1,4 @@
-import { handleNotModifiedResponse } from '@/cache/clientCacheLifecycleExtender';
+import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import {
   extractClientCacheStateFromHeaders,
   hasClientCacheEntryByCacheKey,
@@ -226,11 +226,7 @@ const executeRequestWithLifecycle = async <T>(
   if (isClientEnvironment() && finalResponse.status === 304) {
     const cacheKey = `${config.method?.toUpperCase() || 'GET'}:${url}`;
 
-    await handleNotModifiedResponse(
-      finalResponse,
-      cacheKey,
-      config.client?.revalidate
-    );
+    extendCacheEntryTTL(cacheKey, config.client?.revalidate || 0);
   }
 
   return finalResponse;

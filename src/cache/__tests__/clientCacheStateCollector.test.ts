@@ -34,7 +34,7 @@ describe('clientCacheStateCollector', () => {
     it('should return empty array when not in client environment', async () => {
       mockIsClientEnvironment.mockReturnValue(false);
 
-      const result = await collectValidCacheMetadata();
+      const result = collectValidCacheMetadata();
 
       expect(result).toEqual([]);
     });
@@ -64,12 +64,12 @@ describe('clientCacheStateCollector', () => {
         lastAccessed: Date.now(),
       };
 
-      mockClientCache.keys.mockResolvedValue(mockKeys);
+      mockClientCache.keys.mockReturnValue(mockKeys);
       mockClientCache.get
-        .mockResolvedValueOnce(mockEntry1)
-        .mockResolvedValueOnce(mockEntry2);
+        .mockReturnValueOnce(mockEntry1)
+        .mockReturnValueOnce(mockEntry2);
 
-      const result = await collectValidCacheMetadata();
+      const result = collectValidCacheMetadata();
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
@@ -107,15 +107,15 @@ describe('clientCacheStateCollector', () => {
         lastAccessed: Date.now(),
       };
 
-      mockClientCache.keys.mockResolvedValue(mockKeys);
+      mockClientCache.keys.mockReturnValue(mockKeys);
       mockClientCache.get
-        .mockResolvedValueOnce(mockEntry1)
-        .mockResolvedValueOnce(mockEntry2);
+        .mockReturnValueOnce(mockEntry1)
+        .mockReturnValueOnce(mockEntry2);
       mockIsCacheEntryExpired
         .mockReturnValueOnce(false)
         .mockReturnValueOnce(true);
 
-      const result = await collectValidCacheMetadata();
+      const result = collectValidCacheMetadata();
 
       expect(result).toHaveLength(1);
       expect(result[0].key).toBe('key1');
@@ -154,9 +154,9 @@ describe('clientCacheStateCollector', () => {
 
   describe('createCacheStateHeader', () => {
     it('should return null when no valid cache metadata', async () => {
-      mockClientCache.keys.mockResolvedValue([]);
+      mockClientCache.keys.mockReturnValue([]);
 
-      const result = await createCacheStateHeader();
+      const result = createCacheStateHeader();
 
       expect(result).toBeNull();
     });
@@ -172,10 +172,10 @@ describe('clientCacheStateCollector', () => {
         lastAccessed: Date.now(),
       };
 
-      mockClientCache.keys.mockResolvedValue(mockKeys);
-      mockClientCache.get.mockResolvedValue(mockEntry);
+      mockClientCache.keys.mockReturnValue(mockKeys);
+      mockClientCache.get.mockReturnValue(mockEntry);
 
-      const result = await createCacheStateHeader();
+      const result = createCacheStateHeader();
 
       expect(typeof result).toBe('string');
       expect(result!.length).toBeGreaterThan(0);
@@ -186,7 +186,7 @@ describe('clientCacheStateCollector', () => {
     it('should return false array when not in client environment', async () => {
       mockIsClientEnvironment.mockReturnValue(false);
 
-      const result = await hasValidCacheEntriesByCacheKeys(['key1', 'key2']);
+      const result = hasValidCacheEntriesByCacheKeys(['key1', 'key2']);
 
       expect(result).toEqual([false, false]);
     });
@@ -194,7 +194,7 @@ describe('clientCacheStateCollector', () => {
     it('should check cache entry validity', async () => {
       const keys = ['key1', 'key2'];
       mockClientCache.get
-        .mockResolvedValueOnce({
+        .mockReturnValueOnce({
           key: 'key1',
           data: 'test-data',
           createdAt: Date.now(),
@@ -202,10 +202,10 @@ describe('clientCacheStateCollector', () => {
           source: 'fetch' as const,
           lastAccessed: Date.now(),
         })
-        .mockResolvedValueOnce(null);
+        .mockReturnValueOnce(null);
       mockIsCacheEntryExpired.mockReturnValue(false);
 
-      const result = await hasValidCacheEntriesByCacheKeys(keys);
+      const result = hasValidCacheEntriesByCacheKeys(keys);
 
       expect(result).toEqual([true, false]);
     });

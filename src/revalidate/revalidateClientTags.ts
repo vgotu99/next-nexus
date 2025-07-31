@@ -2,6 +2,6 @@
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
 
-export const revalidateClientTags = async (tags: string[]): Promise<void> => {
-  await clientCacheStore.revalidateByTags(tags);
+export const revalidateClientTags = (tags: string[]): void => {
+  clientCacheStore.revalidateByTags(tags);
 };

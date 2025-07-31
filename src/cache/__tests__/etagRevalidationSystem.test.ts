@@ -1,8 +1,4 @@
-import {
-  parseCacheRevalidationHeader,
-  extendCacheLifecycle,
-  handleNotModifiedResponse,
-} from '@/cache/clientCacheLifecycleExtender';
+import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import {
   collectExpiredCacheETags,
@@ -63,13 +59,13 @@ describe('ETag Revalidation System Integration', () => {
         createdAt: Date.now(),
       };
 
-      mockClientCache.keys.mockResolvedValue(mockKeys);
+      mockClientCache.keys.mockReturnValue(mockKeys);
       mockClientCache.get
-        .mockResolvedValueOnce(mockExpiredEntry)
-        .mockResolvedValueOnce(mockValidEntry)
-        .mockResolvedValueOnce(null);
+        .mockReturnValueOnce(mockExpiredEntry)
+        .mockReturnValueOnce(mockValidEntry)
+        .mockReturnValueOnce(null);
 
-      const result = await collectExpiredCacheETags();
+      const result = collectExpiredCacheETags();
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
@@ -88,9 +84,9 @@ describe('ETag Revalidation System Integration', () => {
     });
 
     it('should handle empty ETag list', async () => {
-      mockClientCache.keys.mockResolvedValue([]);
+      mockClientCache.keys.mockReturnValue([]);
 
-      const result = await createIfNoneMatchHeader();
+      const result = createIfNoneMatchHeader();
 
       expect(result).toBeNull();
     });
@@ -145,22 +141,8 @@ describe('ETag Revalidation System Integration', () => {
   });
 
   describe('Client Cache Lifecycle Extension', () => {
-    it('should parse cache revalidation header correctly', () => {
-      const headerValue = 'extend-ttl=300';
-
-      const result = parseCacheRevalidationHeader(headerValue);
-
-      expect(result).toBe(300);
-    });
-
-    it('should return null for invalid header format', () => {
-      const result = parseCacheRevalidationHeader('invalid-format');
-
-      expect(result).toBeNull();
-    });
-
-    it('should extend cache lifecycle for expired entry', async () => {
-      const mockExpiredEntry = {
+    it('should extend cache lifecycle for an existing entry', () => {
+      const mockEntry = {
         key: 'test-key',
         data: 'test-data',
         expiresAt: Date.now() - 60000,
@@ -169,16 +151,13 @@ describe('ETag Revalidation System Integration', () => {
         createdAt: Date.now(),
       };
 
-      mockClientCache.get.mockResolvedValue(mockExpiredEntry);
-      mockClientCache.set.mockResolvedValue();
+      mockClientCache.get.mockReturnValue(mockEntry);
+      mockClientCache.set.mockReturnValue();
 
-      const result = await extendCacheLifecycle({
-        cacheKey: 'test-key',
-        extensionTTL: 300,
-        reason: 'etag-match',
-      });
+      const result = extendCacheEntryTTL('test-key', 300);
 
       expect(result).toBe(true);
+      expect(mockClientCache.get).toHaveBeenCalledWith('test-key');
       expect(mockClientCache.set).toHaveBeenCalledWith(
         'test-key',
         expect.objectContaining({
@@ -186,32 +165,20 @@ describe('ETag Revalidation System Integration', () => {
           lastAccessed: expect.any(Number),
         })
       );
+
+      const newEntry = mockClientCache.set.mock.calls[0][1];
+
+      expect(newEntry.expiresAt).toBeGreaterThan(Date.now() + 299 * 1000);
     });
 
-    it('should handle 304 Not Modified response', async () => {
-      const response = new Response(null, {
-        status: 304,
-        headers: {
-          'x-next-fetch-cache-revalidation': 'extend-ttl=600',
-        },
-      });
+    it('should return false if cache entry does not exist', () => {
+      mockClientCache.get.mockReturnValue(null);
 
-      const mockEntry = {
-        key: 'test-key',
-        data: 'test-data',
-        expiresAt: Date.now() - 60000,
-        source: 'fetch' as const,
-        lastAccessed: Date.now(),
-        createdAt: Date.now(),
-      };
+      const result = extendCacheEntryTTL('non-existent-key', 300);
 
-      mockClientCache.get.mockResolvedValue(mockEntry);
-      mockClientCache.set.mockResolvedValue();
-
-      const result = await handleNotModifiedResponse(response, 'test-key');
-
-      expect(result).toBe(true);
-      expect(mockClientCache.set).toHaveBeenCalled();
+      expect(result).toBe(false);
+      expect(mockClientCache.get).toHaveBeenCalledWith('non-existent-key');
+      expect(mockClientCache.set).not.toHaveBeenCalled();
     });
   });
 
@@ -230,10 +197,10 @@ describe('ETag Revalidation System Integration', () => {
         createdAt: Date.now(),
       };
 
-      mockClientCache.keys.mockResolvedValue(['api-key']);
-      mockClientCache.get.mockResolvedValue(expiredEntry);
+      mockClientCache.keys.mockReturnValue(['api-key']);
+      mockClientCache.get.mockReturnValue(expiredEntry);
 
-      const ifNoneMatchHeader = await createIfNoneMatchHeader();
+      const ifNoneMatchHeader = createIfNoneMatchHeader();
       expect(ifNoneMatchHeader).toBe(dataETag);
 
       mockIsServerEnvironment.mockReturnValue(true);
@@ -246,22 +213,13 @@ describe('ETag Revalidation System Integration', () => {
       const validation = performETagValidation(headers, currentData);
       expect(validation.shouldUseCache).toBe(true);
 
-      const notModifiedResponse = createNotModifiedResponse(
-        '/api/test',
-        validation.dataETag,
-        'extend-ttl=300'
-      );
-
-      expect(notModifiedResponse.status).toBe(304);
-
-      mockClientCache.set.mockResolvedValue();
-
-      const extensionResult = await handleNotModifiedResponse(
-        notModifiedResponse,
-        'api-key'
-      );
+      const extensionResult = extendCacheEntryTTL('api-key', 300);
 
       expect(extensionResult).toBe(true);
+      expect(mockClientCache.set).toHaveBeenCalledWith(
+        'api-key',
+        expect.objectContaining({ etag: dataETag })
+      );
     });
 
     it('should handle data change scenario', async () => {

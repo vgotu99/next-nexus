@@ -1,4 +1,4 @@
-import { handleNotModifiedResponse } from '@/cache/clientCacheLifecycleExtender';
+import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { createConditionalResponse } from '@/cache/serverETagValidator';
 import type { ClientCacheMetadata } from '@/types/cache';
@@ -70,13 +70,10 @@ describe('ETag Revalidation Flow - client.revalidate TTL Validation', () => {
       createdAt: Date.now(),
     };
 
-    mockClientCache.get.mockResolvedValue(expiredEntry);
-    mockClientCache.set.mockResolvedValue();
+    mockClientCache.get.mockReturnValue(expiredEntry);
+    mockClientCache.set.mockReturnValue();
 
-    const result = await handleNotModifiedResponse(
-      conditionalResult.response!,
-      'test-key'
-    );
+    const result = extendCacheEntryTTL('test-key', 300);
 
     expect(result).toBe(true);
 
@@ -136,14 +133,10 @@ describe('ETag Revalidation Flow - client.revalidate TTL Validation', () => {
       createdAt: Date.now(),
     };
 
-    mockClientCache.get.mockResolvedValue(expiredEntry);
-    mockClientCache.set.mockResolvedValue();
+    mockClientCache.get.mockReturnValue(expiredEntry);
+    mockClientCache.set.mockReturnValue();
 
-    const result = await handleNotModifiedResponse(
-      conditionalResult.response!,
-      'test-key',
-      300
-    );
+    const result = extendCacheEntryTTL('test-key', 300);
 
     expect(result).toBe(true);
 
@@ -203,12 +196,12 @@ describe('ETag Revalidation Flow - client.revalidate TTL Validation', () => {
         createdAt: Date.now(),
       };
 
-      mockClientCache.get.mockResolvedValue(expiredEntry);
-      mockClientCache.set.mockResolvedValue();
+      mockClientCache.get.mockReturnValue(expiredEntry);
+      mockClientCache.set.mockReturnValue();
 
-      await handleNotModifiedResponse(
-        conditionalResult.response!,
-        `test-key-${testCase.revalidate}`
+      extendCacheEntryTTL(
+        `test-key-${testCase.revalidate}`,
+        testCase.revalidate
       );
 
       const setCallArgs =
