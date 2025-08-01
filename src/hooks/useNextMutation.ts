@@ -3,7 +3,7 @@
 import { useCallback, useReducer } from 'react';
 
 import { useNextFetchContext } from '@/context/NextFetchContext';
-import type { MutationDefinition } from '@/types/definition';
+import type { NextFetchDefinition } from '@/types/definition';
 import type {
   NextMutationState,
   UseNextMutationOptions,
@@ -68,7 +68,7 @@ export const useNextMutation = <
 >(
   mutationDefinitionFactory: (
     variables: TVariables
-  ) => MutationDefinition<TData, TVariables>,
+  ) => NextFetchDefinition<TData>,
   options: UseNextMutationOptions<TContext, TError, TData, TVariables> = {}
 ): UseNextMutationResult<TData, TError, TVariables> => {
   if (

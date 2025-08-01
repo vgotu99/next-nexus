@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { useNextFetchContext } from '@/context/NextFetchContext';
-import type { GetNextFetchDefinition } from '@/types/definition';
+import type { GetNextFetchDefinition, NextFetchDefinition } from '@/types/definition';
 import type {
   NextQueryState,
   UseNextQueryOptions,
@@ -97,7 +97,7 @@ const fetchData = async <TData>(
 };
 
 export const useNextQuery = <TData = unknown, TSelectedData = TData>(
-  definition: GetNextFetchDefinition<TData>,
+  definition: NextFetchDefinition<TData>,
   options: UseNextQueryOptions<TData, TSelectedData> = {}
 ): UseNextQueryResult<TSelectedData> => {
   if (!definition) {
