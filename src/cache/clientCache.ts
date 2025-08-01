@@ -44,7 +44,11 @@ const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
     if (!entry) return;
 
     const newData = updater(entry.data);
-    const updatedEntry = { ...entry, data: newData };
+    const updatedEntry = {
+      ...entry,
+      data: newData,
+      source: 'manual' as const,
+    };
     clientCacheStore.update(cacheKey, updatedEntry);
   };
 
@@ -52,7 +56,10 @@ const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
     const entry = clientCacheStore.get<TData>(cacheKey);
     if (!entry) return;
 
-    clientCacheStore.update(cacheKey, { expiresAt: 0 });
+    clientCacheStore.update(cacheKey, {
+      expiresAt: 0,
+      source: 'manual' as const,
+    });
   };
 
   const checkStaleStatus = (): boolean => {

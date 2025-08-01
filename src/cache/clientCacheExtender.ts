@@ -1,15 +1,5 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import type { ClientCacheEntry } from '@/types/cache';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
-
-const extendEntryTTL = <T>(
-  entry: ClientCacheEntry<T>,
-  extensionSeconds: number,
-): ClientCacheEntry<T> => ({
-  ...entry,
-  expiresAt: getCurrentTimestamp() + extensionSeconds * 1000,
-  lastAccessed: getCurrentTimestamp(),
-});
 
 export const extendCacheEntryTTL = (
   cacheKey: string,
@@ -21,8 +11,10 @@ export const extendCacheEntryTTL = (
     return false;
   }
 
-  const extendedEntry = extendEntryTTL(entry, extensionSeconds);
-  clientCacheStore.set(cacheKey, extendedEntry);
+  clientCacheStore.update(cacheKey, {
+    expiresAt: getCurrentTimestamp() + extensionSeconds * 1000,
+    source: 'fetch',
+  });
 
   return true;
 };

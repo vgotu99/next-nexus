@@ -85,12 +85,13 @@ const fetchData = async <TData>(
 
   const { data } = await nextFetchInstance(definition);
 
-  clientCacheStore.setWithTTL(
+  clientCacheStore.set(
     cacheKey,
     data,
     options?.client?.revalidate,
     options?.client?.tags,
-    options?.server?.tags
+    options?.server?.tags,
+    'fetch'
   );
 
   return data;

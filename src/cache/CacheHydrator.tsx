@@ -50,7 +50,7 @@ const hydrateClientCache = (hydrationData: HydrationData): number => {
 
     entries.forEach(
       ({ key, data, clientRevalidate, clientTags, serverTags }) => {
-        clientCacheStore.setWithTTL(
+        clientCacheStore.set(
           key,
           data,
           clientRevalidate,
