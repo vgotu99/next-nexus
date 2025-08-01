@@ -1,3 +1,3 @@
-export interface NextFetchResponse<T = any> extends Response {
+export interface NextFetchResponse<T = unknown> extends Response {
   data: T;
 }
