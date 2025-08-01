@@ -1,4 +1,4 @@
-import type { ErrorCode } from './errorCodes';
+import type { ERROR_CODES } from '@/constants/errorCodes';
 
 export interface NextFetchErrorData {
   message?: string;
@@ -28,4 +28,12 @@ export interface NextFetchErrorInfo extends Error {
   readonly request?: Request;
   readonly config?: RequestInit;
   readonly code?: ErrorCode;
+}
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+export interface ErrorMessageTemplate {
+  message: (...args: string[]) => string;
+  solution?: string;
+  documentation?: string;
 }
