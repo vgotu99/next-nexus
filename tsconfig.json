@@ -24,7 +24,8 @@
       "@/utils": ["src/utils"],
       "@/errors": ["src/errors"],
       "@/cache": ["src/cache"],
-      "@/providers": ["src/providers"]
+      "@/providers": ["src/providers"],
+      "@/constants": ["src/constants"]
     }
   },
   "include": [
@@ -34,9 +35,5 @@
     "**/*.test.tsx",
     "jest.config.js"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "build"
-  ]
-} 
+  "exclude": ["node_modules", "dist", "build"]
+}
