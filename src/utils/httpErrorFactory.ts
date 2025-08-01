@@ -1,14 +1,11 @@
-import { ERROR_CODES } from '@/errors/errorCodes';
+import { ERROR_CODES } from '@/constants/errorCodes';
 import { createNextFetchError } from '@/errors/errorFactory';
-import type {
-  NextFetchErrorData,
-  NextFetchErrorInfo,
-} from '@/errors/errorTypes';
+import type { NextFetchErrorData, NextFetchErrorInfo } from '@/types/error';
 import {
   extractErrorMessage,
   getErrorCodeByStatus,
   getErrorMessageByStatus,
-} from '@/errors/errorUtils';
+} from '@/utils/errorUtils';
 
 export const createHttpError = (
   status: number,
@@ -34,7 +31,7 @@ export const validateUrl = (url: string): void => {
   } catch (error) {
     throw createNextFetchError('Invalid URL', {
       request: new Request(url),
-      code: ERROR_CODES.ERR_INVALID_URL,
+      code: ERROR_CODES.INVALID_URL_ERROR,
     });
   }
 };
@@ -50,14 +47,14 @@ export const createNetworkError = (
     ) {
       return createNextFetchError('Network Error', {
         request,
-        code: ERROR_CODES.ERR_NETWORK,
+        code: ERROR_CODES.NETWORK_ERROR,
       });
     }
 
     if (error.message.includes('CORS')) {
       return createNextFetchError('CORS Error', {
         request,
-        code: ERROR_CODES.ERR_NETWORK,
+        code: ERROR_CODES.NETWORK_ERROR,
       });
     }
   }
@@ -66,12 +63,12 @@ export const createNetworkError = (
     if (error.message === 'timeout') {
       return createNextFetchError('Request timeout', {
         request,
-        code: ERROR_CODES.ERR_TIMEOUT,
+        code: ERROR_CODES.TIMEOUT_ERROR,
       });
     } else {
       return createNextFetchError('Request canceled', {
         request,
-        code: ERROR_CODES.ERR_CANCELED,
+        code: ERROR_CODES.CANCELED_ERROR,
       });
     }
   }
@@ -79,7 +76,7 @@ export const createNetworkError = (
   if (error instanceof SyntaxError && error.message.includes('JSON')) {
     return createNextFetchError('Invalid JSON response', {
       request,
-      code: ERROR_CODES.ERR_BAD_RESPONSE,
+      code: ERROR_CODES.BAD_RESPONSE_ERROR,
     });
   }
 
@@ -87,7 +84,7 @@ export const createNetworkError = (
     error instanceof Error ? error.message : 'Unknown error',
     {
       request,
-      code: ERROR_CODES.ERR_UNKNOWN,
+      code: ERROR_CODES.UNKNOWN_ERROR,
     }
   );
 };

@@ -1,5 +1,5 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { ERROR_MESSAGE_PREFIX } from '@/constants';
+import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import type { CacheHandler } from '@/types/cache';
 import type {
   GetNextFetchDefinition,

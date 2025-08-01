@@ -3,7 +3,7 @@ import type {
   NextFetchErrorInfo,
   NextFetchErrorOptions,
   NextFetchErrorResponse,
-} from './errorTypes';
+} from '@/types/error';
 
 const createErrorResponse = (
   response: Response,

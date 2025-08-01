@@ -1,5 +1,5 @@
-import { MAX_CACHE_KEY_LENGTH } from '@/constants';
-import type { CacheKeyOptions, CacheEntry } from '@/types';
+import { MAX_CACHE_KEY_LENGTH } from '@/constants/cache';
+import type { CacheKeyOptions, CacheEntry } from '@/types/cache';
 import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
 
 const buildTagsComponent = (

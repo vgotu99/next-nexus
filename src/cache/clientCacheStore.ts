@@ -1,7 +1,5 @@
-import {
-  DEFAULT_CLIENT_CACHE_MAX_SIZE,
-  ERROR_MESSAGE_PREFIX,
-} from '@/constants';
+import { DEFAULT_CLIENT_CACHE_MAX_SIZE } from '@/constants/cache';
+import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,

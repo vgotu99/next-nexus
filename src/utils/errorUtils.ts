@@ -1,5 +1,11 @@
-import { type ErrorCode, ERROR_CODES } from './errorCodes';
-import type { NextFetchErrorData, NextFetchErrorInfo } from './errorTypes';
+import { ERROR_CODES } from '@/constants/errorCodes';
+import { ERROR_MESSAGES } from '@/constants/errorMessages';
+import type {
+  ErrorCode,
+  ErrorMessageTemplate,
+  NextFetchErrorData,
+  NextFetchErrorInfo,
+} from '@/types/error';
 
 const ERROR_MESSAGE_KEYWORDS = {
   network: ['fetch', 'network', 'offline'],
@@ -31,10 +37,10 @@ export const isClientError = (status: number): boolean =>
 export const isServerError = (status: number): boolean => status >= 500;
 
 const STATUS_TO_ERROR_CODE_MAP = new Map<number, ErrorCode>([
-  [401, ERROR_CODES.ERR_UNAUTHORIZED],
-  [403, ERROR_CODES.ERR_FORBIDDEN],
-  [404, ERROR_CODES.ERR_NOT_FOUND],
-  [429, ERROR_CODES.ERR_RATE_LIMITED],
+  [401, ERROR_CODES.UNAUTHORIZED_ERROR],
+  [403, ERROR_CODES.FORBIDDEN_ERROR],
+  [404, ERROR_CODES.NOT_FOUND_ERROR],
+  [429, ERROR_CODES.RATE_LIMITED_ERROR],
 ]);
 
 export const getErrorCodeByStatus = (status: number): ErrorCode => {
@@ -42,8 +48,8 @@ export const getErrorCodeByStatus = (status: number): ErrorCode => {
     return STATUS_TO_ERROR_CODE_MAP.get(status)!;
   }
   return isClientError(status)
-    ? ERROR_CODES.ERR_BAD_REQUEST
-    : ERROR_CODES.ERR_SERVER;
+    ? ERROR_CODES.BAD_REQUEST_ERROR
+    : ERROR_CODES.SERVER_ERROR;
 };
 
 const STATUS_TO_ERROR_MESSAGE_MAP: Record<number, string> = {
@@ -87,4 +93,19 @@ export const extractErrorMessage = (data: NextFetchErrorData): string => {
   }
 
   return 'Unknown error occurred';
+};
+
+export const createErrorMessage = (
+  errorCode: ErrorCode,
+  variables: string
+): Omit<ErrorMessageTemplate, 'message'> & { message: string } => {
+  const template = ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.UNKNOWN_ERROR;
+
+  const message = template.message(variables);
+
+  return {
+    message: message,
+    solution: template.solution,
+    documentation: template.documentation,
+  };
 };

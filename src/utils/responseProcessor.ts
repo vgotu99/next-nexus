@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@/errors/errorCodes';
+import { ERROR_CODES } from '@/constants/errorCodes';
 import { createNextFetchError } from '@/errors/errorFactory';
 import type { InternalNextFetchResponse } from '@/types/internal';
 
@@ -14,7 +14,7 @@ export const parseJsonResponse = async <T>(response: Response): Promise<T> => {
   } catch (error) {
     throw createNextFetchError('Invalid JSON response', {
       request: new Request(response.url),
-      code: ERROR_CODES.ERR_BAD_RESPONSE,
+      code: ERROR_CODES.BAD_RESPONSE_ERROR,
     });
   }
 };

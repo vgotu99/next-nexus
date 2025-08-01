@@ -1,4 +1,5 @@
-import { ERROR_CODES } from '../errorCodes';
+import { ERROR_CODES } from '@/constants/errorCodes';
+
 import { isNextFetchError, NextFetchError } from '../NextFetchError';
 
 const mockRequest = jest.fn();
@@ -28,7 +29,7 @@ describe('NextFetchError', () => {
     const error = NextFetchError('Resource not found', {
       response: mockResponse,
       data: { error: 'Not Found' },
-      code: ERROR_CODES.ERR_NOT_FOUND,
+      code: ERROR_CODES.NOT_FOUND_ERROR,
     });
 
     expect(error.name).toBe('NextFetchError');
@@ -36,7 +37,7 @@ describe('NextFetchError', () => {
     expect(error.response?.status).toBe(404);
     expect(error.response?.statusText).toBe('Not Found');
     expect(error.response?.data).toEqual({ error: 'Not Found' });
-    expect(error.code).toBe(ERROR_CODES.ERR_NOT_FOUND);
+    expect(error.code).toBe(ERROR_CODES.NOT_FOUND_ERROR);
   });
 
   it('should create error with request details', () => {
@@ -47,13 +48,13 @@ describe('NextFetchError', () => {
 
     const error = NextFetchError('Network error', {
       request: mockRequest,
-      code: ERROR_CODES.ERR_NETWORK,
+      code: ERROR_CODES.NETWORK_ERROR,
     });
 
     expect(error.name).toBe('NextFetchError');
     expect(error.message).toBe('Network error');
     expect(error.request).toBe(mockRequest);
-    expect(error.code).toBe(ERROR_CODES.ERR_NETWORK);
+    expect(error.code).toBe(ERROR_CODES.NETWORK_ERROR);
   });
 
   it('should inherit from Error', () => {
