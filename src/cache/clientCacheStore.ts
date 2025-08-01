@@ -1,3 +1,7 @@
+import {
+  DEFAULT_CLIENT_CACHE_MAX_SIZE,
+  ERROR_MESSAGE_PREFIX,
+} from '@/constants';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,
@@ -16,26 +20,31 @@ declare global {
 
 const clientCacheState: ClientCacheState = {
   clientCache: new Map(),
-  maxSize: 200,
-  defaultTTL: 3 * 60 * 1000,
+  maxSize: DEFAULT_CLIENT_CACHE_MAX_SIZE,
 };
 
-const listeners = new Map<string, Set<() => void>>();
+const listeners = new Map<
+  string,
+  Set<(entry: ClientCacheEntry | null) => void>
+>();
 
-const notify = (cacheKey: string): void => {
+const notify = (cacheKey: string, entry: ClientCacheEntry | null): void => {
   const keyListeners = listeners.get(cacheKey);
   if (!keyListeners) return;
 
   keyListeners.forEach(callback => {
     try {
-      callback();
+      callback(entry);
     } catch (error) {
-      console.error('[next-fetch] Error in cache listener:', error);
+      console.error(`${ERROR_MESSAGE_PREFIX} Error in cache listener:`, error);
     }
   });
 };
 
-const subscribe = (cacheKey: string, callback: () => void): (() => void) => {
+const subscribe = <T = unknown>(
+  cacheKey: string,
+  callback: (entry: ClientCacheEntry<T> | null) => void
+): (() => void) => {
   if (!isClientEnvironment()) return () => {};
 
   if (!listeners.has(cacheKey)) {
@@ -43,13 +52,13 @@ const subscribe = (cacheKey: string, callback: () => void): (() => void) => {
   }
 
   const keyListeners = listeners.get(cacheKey)!;
-  keyListeners.add(callback);
+  keyListeners.add(callback as (entry: ClientCacheEntry | null) => void);
 
   return () => {
     const keyListeners = listeners.get(cacheKey);
     if (!keyListeners) return;
 
-    keyListeners.delete(callback);
+    keyListeners.delete(callback as (entry: ClientCacheEntry | null) => void);
 
     if (keyListeners.size === 0) {
       listeners.delete(cacheKey);
@@ -60,12 +69,18 @@ const subscribe = (cacheKey: string, callback: () => void): (() => void) => {
 const createClientCacheEntry = <T>(
   data: T,
   key: string,
-  ttl: number,
+  clientRevalidate: number = 0,
   clientTags: string[] = [],
   serverTags: string[] = [],
-  source: ClientCacheEntry['source'] = 'manual'
+  source: ClientCacheEntry['source']
 ): ClientCacheEntry<T> => {
-  const baseEntry = createCacheEntry(data, key, ttl, clientTags, serverTags);
+  const baseEntry = createCacheEntry(
+    data,
+    key,
+    clientRevalidate,
+    clientTags,
+    serverTags
+  );
 
   return {
     ...baseEntry,
@@ -90,21 +105,10 @@ const findLRUKey = (
   return oldestEntry.key || null;
 };
 
-const shouldDelete = (
+const shouldEvictEntry = (
   clientCache: Map<string, ClientCacheEntry>,
-  maxSize: number,
-  key: string
-): boolean => clientCache.size >= maxSize && !clientCache.has(key);
-
-const filterExpiredEntries = (
-  clientCache: Map<string, ClientCacheEntry>
-): Map<string, ClientCacheEntry> => {
-  const validEntries = Array.from(clientCache.entries()).filter(
-    ([, entry]) => !isCacheEntryExpired(entry)
-  );
-
-  return new Map(validEntries);
-};
+  maxSize: number
+): boolean => clientCache.size >= maxSize;
 
 const filterByTags = (
   clientCache: Map<string, ClientCacheEntry>,
@@ -149,77 +153,97 @@ const calculateStats = (clientCache: Map<string, ClientCacheEntry>) => {
   );
 };
 
+const setClientCache = <T = unknown>(
+  key: string,
+  entry: ClientCacheEntry<T>
+): void => {
+  if (!isClientEnvironment()) return;
+
+  if (clientCacheState.clientCache.has(key)) {
+    const updatedEntry = updateLastAccessed(entry);
+    clientCacheState.clientCache.set(key, updatedEntry);
+    notify(key, updatedEntry);
+    return;
+  }
+
+  if (
+    shouldEvictEntry(clientCacheState.clientCache, clientCacheState.maxSize)
+  ) {
+    const lruKey = findLRUKey(clientCacheState.clientCache);
+    if (lruKey) {
+      clientCacheState.clientCache.delete(lruKey);
+    }
+  }
+
+  const updatedEntry = updateLastAccessed(entry);
+  clientCacheState.clientCache.set(key, updatedEntry);
+  notify(key, updatedEntry);
+};
+
 const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
   if (!isClientEnvironment()) return null;
 
   const entry = clientCacheState.clientCache.get(key) as
     | ClientCacheEntry<T>
     | undefined;
-
   if (!entry) return null;
-
-  if (isCacheEntryExpired(entry)) {
-    clientCacheState.clientCache.delete(key);
-    notify(key);
-
-    return null;
-  }
 
   const updatedEntry = updateLastAccessed(entry);
   clientCacheState.clientCache.set(key, updatedEntry);
-
   return updatedEntry;
 };
 
-const set = <T = unknown>(key: string, entry: ClientCacheEntry<T>): void => {
-  if (!isClientEnvironment()) return;
-
-  const lruKey = shouldDelete(
-    clientCacheState.clientCache,
-    clientCacheState.maxSize,
-    key
-  )
-    ? findLRUKey(clientCacheState.clientCache)
-    : null;
-
-  if (lruKey) {
-    clientCacheState.clientCache.delete(lruKey);
-  }
-
-  clientCacheState.clientCache.set(key, entry);
-  notify(key);
-};
-
-const setWithTTL = <T = unknown>(
+const set = <T = unknown>(
   key: string,
   data: T,
-  clientRevalidate?: number,
-  clientTags?: string[],
-  serverTags?: string[],
-  source: ClientCacheEntry['source'] = 'fetch'
+  clientRevalidate: number = 0,
+  clientTags: string[] = [],
+  serverTags: string[] = [],
+  source: ClientCacheEntry['source']
 ): void => {
   if (!isClientEnvironment()) return;
 
-  const ttl = clientRevalidate
-    ? clientRevalidate * 1000
-    : clientCacheState.defaultTTL;
   const entry = createClientCacheEntry(
     data,
     key,
-    ttl,
+    clientRevalidate,
     clientTags,
     serverTags,
     source
   );
 
-  set(key, entry);
+  setClientCache(key, entry);
+};
+
+const update = <T = unknown>(
+  key: string,
+  partialEntry: Partial<Omit<ClientCacheEntry<T>, 'key' | 'createdAt'>>
+): void => {
+  if (!isClientEnvironment()) return;
+
+  const existingEntry = get(key);
+  if (!existingEntry) return;
+
+  const newPartialEntry = {
+    ...partialEntry,
+    expiresAt:
+      partialEntry.expiresAt !== undefined
+        ? partialEntry.expiresAt
+        : existingEntry.clientRevalidate
+          ? getCurrentTimestamp() + existingEntry.clientRevalidate * 1000
+          : existingEntry.expiresAt,
+  };
+
+  const updatedEntry = { ...existingEntry, ...newPartialEntry };
+
+  setClientCache(key, updatedEntry);
 };
 
 const deleteKey = (key: string): boolean => {
   if (!isClientEnvironment()) return false;
 
   const deleted = clientCacheState.clientCache.delete(key);
-  if (deleted) notify(key);
+  if (deleted) notify(key, null);
 
   return deleted;
 };
@@ -227,25 +251,26 @@ const deleteKey = (key: string): boolean => {
 const clear = (): void => {
   if (!isClientEnvironment()) return;
 
+  clientCacheState.clientCache.forEach((_value, key) => {
+    notify(key, null);
+  });
+
   clientCacheState.clientCache.clear();
 };
 
 const keys = (): string[] => {
   if (!isClientEnvironment()) return [];
-
   return Array.from(clientCacheState.clientCache.keys());
 };
 
 const has = (key: string): boolean => {
   if (!isClientEnvironment()) return false;
-
   const entry = get(key);
   return entry !== null;
 };
 
 const size = (): number => {
   if (!isClientEnvironment()) return 0;
-
   return clientCacheState.clientCache.size;
 };
 
@@ -253,19 +278,24 @@ const revalidateByTags = (tags: string[]): void => {
   if (!isClientEnvironment() || !tags.length) return;
 
   const keysToDelete = filterByTags(clientCacheState.clientCache, tags);
-
   keysToDelete.forEach(key => deleteKey(key));
 };
 
 const cleanup = (): number => {
   if (!isClientEnvironment()) return 0;
 
-  const originalSize = clientCacheState.clientCache.size;
-  clientCacheState.clientCache = filterExpiredEntries(
-    clientCacheState.clientCache
-  );
+  const originalSize = size();
+  const expiredKeys: string[] = [];
 
-  return originalSize - clientCacheState.clientCache.size;
+  clientCacheState.clientCache.forEach((entry, key) => {
+    if (isCacheEntryExpired(entry)) {
+      expiredKeys.push(key);
+    }
+  });
+
+  expiredKeys.forEach(key => deleteKey(key));
+
+  return originalSize - size();
 };
 
 const getStats = () => {
@@ -287,10 +317,32 @@ const getStats = () => {
   };
 };
 
+const autoCleanupState = { intervalId: null as NodeJS.Timeout | null };
+
+const startAutoCleanup = (intervalMs: number = 60000): void => {
+  if (!isClientEnvironment() || autoCleanupState.intervalId) return;
+
+  autoCleanupState.intervalId = setInterval(() => {
+    const removedCount = cleanup();
+    if (removedCount > 0) {
+      console.debug(
+        `${ERROR_MESSAGE_PREFIX} Auto cleanup removed ${removedCount} expired entries`
+      );
+    }
+  }, intervalMs);
+};
+
+const stopAutoCleanup = (): void => {
+  if (autoCleanupState.intervalId) {
+    clearInterval(autoCleanupState.intervalId);
+    autoCleanupState.intervalId = null;
+  }
+};
+
 export const clientCacheStore = {
   get,
   set,
-  setWithTTL,
+  update,
   delete: deleteKey,
   clear,
   keys,
@@ -300,4 +352,6 @@ export const clientCacheStore = {
   cleanup,
   getStats,
   subscribe,
+  startAutoCleanup,
+  stopAutoCleanup,
 };

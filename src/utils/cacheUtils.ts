@@ -1,92 +1,72 @@
-import type {
-  CacheKeyOptions,
-  CacheEntry,
-  CacheRevalidateTime,
-} from '@/types';
+import { MAX_CACHE_KEY_LENGTH } from '@/constants';
+import type { CacheKeyOptions, CacheEntry } from '@/types';
 import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
+
+const buildTagsComponent = (
+  clientTags?: string[],
+  serverTags?: string[]
+): string | null => {
+  const allTags = [...(clientTags || []), ...(serverTags || [])];
+  if (allTags.length === 0) return null;
+
+  const sortedTags = [...allTags].sort().join(',');
+  return `tags:${sortedTags}`;
+};
 
 export const generateCacheKey = ({
   endpoint,
   method = 'GET',
-  params,
   clientTags,
   serverTags,
 }: CacheKeyOptions): string => {
   const baseKey = `${method.toUpperCase()}:${endpoint}`;
+  const tagsComponent = buildTagsComponent(clientTags, serverTags);
 
-  const paramComponent =
-    params && Object.keys(params).length > 0
-      ? `params:${Object.keys(params)
-          .sort()
-          .map(key => `${key}=${encodeURIComponent(String(params[key]))}`)
-          .join('&')}`
-      : null;
-
-  const allTags = [...(clientTags || []), ...(serverTags || [])];
-  const tagsComponent =
-    allTags.length > 0 ? `tags:${[...allTags].sort().join(',')}` : null;
-
-  return [baseKey, paramComponent, tagsComponent].filter(Boolean).join('|');
+  return [baseKey, tagsComponent].filter(Boolean).join('|');
 };
 
 export const isCacheEntryExpired = (entry: CacheEntry): boolean =>
   isPast(entry.expiresAt);
 
-export const calculateCacheTTL = (revalidate?: CacheRevalidateTime): number => {
-  if (
-    revalidate === false ||
-    (typeof revalidate === 'number' && revalidate < 0)
-  ) {
-    return Infinity;
-  }
-
-  if (typeof revalidate === 'number' && revalidate > 0) {
-    return revalidate * 1000;
-  }
-
-  return 5 * 60 * 1000;
-};
-
 export const normalizeCacheTags = (tags?: string[]): string[] => {
-  if (!tags?.length) {
-    return [];
-  }
+  if (!tags?.length) return [];
 
   const processedTags = tags
-    .filter(tag => typeof tag === 'string' && tag.trim())
-    .map(tag => tag.trim().toLowerCase());
+    .map(tag => tag.trim())
+    .filter(tag => tag.length > 0);
 
   return [...new Set(processedTags)].sort();
+};
+
+export const hasCommonTags = (tagsA: string[], tagsB: string[]): boolean => {
+  if (!tagsA.length || !tagsB.length) return false;
+
+  const tagsSet = new Set(tagsA);
+  return tagsB.some(tag => tagsSet.has(tag));
 };
 
 export const createCacheEntry = <T>(
   data: T,
   key: string,
-  ttl: number,
+  clientRevalidate: number = 0,
   clientTags: string[] = [],
   serverTags: string[] = [],
   etag?: string
 ): CacheEntry<T> => {
   const now = getCurrentTimestamp();
-  const expiresAt = ttl === Infinity ? Infinity : now + ttl;
+  const expiresAt =
+    clientRevalidate > 0 ? now + clientRevalidate * 1000 : now - 1000; // TTL이 0이면 1초 전으로 설정하여 즉시 만료
 
   return {
     data,
     key,
     createdAt: now,
     expiresAt,
+    clientRevalidate,
     clientTags: normalizeCacheTags(clientTags),
     serverTags: normalizeCacheTags(serverTags),
     etag,
   };
-};
-
-export const hasCommonTags = (tagsA: string[], tagsB: string[]): boolean => {
-  if (!tagsA.length || !tagsB.length) {
-    return false;
-  }
-  const tagsSet = new Set(tagsA);
-  return tagsB.some(tag => tagsSet.has(tag));
 };
 
 export const generateETag = (data: unknown): string => {
@@ -101,8 +81,6 @@ export const generateETag = (data: unknown): string => {
 };
 
 export const isValidCacheKey = (key: string): boolean => {
-  if (typeof key !== 'string' || !key) {
-    return false;
-  }
-  return key.length <= 1000 && !key.includes('\n');
+  if (typeof key !== 'string' || !key) return false;
+  return key.length <= MAX_CACHE_KEY_LENGTH && !key.includes('\n');
 };

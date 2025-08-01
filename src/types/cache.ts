@@ -27,7 +27,6 @@ export interface CacheEntry<T = unknown> {
 export interface CacheKeyOptions {
   endpoint: string;
   method?: string;
-  params?: Record<string, unknown>;
   clientTags?: string[];
   serverTags?: string[];
 }
@@ -40,7 +39,6 @@ export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
 export interface ClientCacheState {
   clientCache: Map<string, ClientCacheEntry>;
   maxSize: number;
-  defaultTTL: number;
 }
 
 export type CacheRevalidateTime = number | false;

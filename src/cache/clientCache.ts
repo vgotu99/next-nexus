@@ -1,4 +1,5 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
+import { ERROR_MESSAGE_PREFIX } from '@/constants';
 import type { CacheHandler } from '@/types/cache';
 import type {
   GetNextFetchDefinition,
@@ -12,7 +13,7 @@ const validateGetDefinition = (
 ): void => {
   if (!isGetDefinition(definition)) {
     console.warn(
-      '[next-fetch] clientCache is primarily designed for GET requests. ' +
+      `${ERROR_MESSAGE_PREFIX} clientCache is primarily designed for GET requests. ` +
         'Using it with mutation definitions may not work as expected.'
     );
   }
@@ -31,47 +32,47 @@ const generateCacheKeyFromDefinition = (
 };
 
 const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
+  const getData = (): TData | undefined => {
+    const entry = clientCacheStore.get<TData>(cacheKey);
+    return entry?.data;
+  };
+
+  const updateEntry = (
+    updater: (oldData: TData | undefined) => TData
+  ): void => {
+    const entry = clientCacheStore.get<TData>(cacheKey);
+    if (!entry) return;
+
+    const newData = updater(entry.data);
+    const updatedEntry = { ...entry, data: newData };
+    clientCacheStore.update(cacheKey, updatedEntry);
+  };
+
+  const invalidateEntry = (): void => {
+    const entry = clientCacheStore.get<TData>(cacheKey);
+    if (!entry) return;
+
+    clientCacheStore.update(cacheKey, { expiresAt: 0 });
+  };
+
+  const checkStaleStatus = (): boolean => {
+    const entry = clientCacheStore.get(cacheKey);
+    return !entry || isCacheEntryExpired(entry);
+  };
+
+  const subscribeToChanges = (callback: (data: TData | undefined) => void) => {
+    return clientCacheStore.subscribe(cacheKey, entry => {
+      callback(entry?.data as TData | undefined);
+    });
+  };
+
   return {
-    get: () => {
-      return clientCacheStore.get<TData>(cacheKey)?.data;
-    },
-
-    set: updater => {
-      const entry = clientCacheStore.get<TData>(cacheKey);
-
-      if (!entry) return;
-
-      const currentData = entry?.data;
-      const newData = updater(currentData);
-      const newEntry = {
-        ...entry,
-        data: newData,
-      };
-
-      clientCacheStore.set(cacheKey, newEntry);
-    },
-
-    remove: () => {
-      clientCacheStore.delete(cacheKey);
-    },
-
-    invalidate: () => {
-      const entry = clientCacheStore.get<TData>(cacheKey);
-      if (entry) {
-        clientCacheStore.set(cacheKey, { ...entry, expiresAt: 0 });
-      }
-    },
-
-    isStale: () => {
-      const entry = clientCacheStore.get(cacheKey);
-      return !entry || isCacheEntryExpired(entry);
-    },
-
-    subscribe: callback => {
-      return clientCacheStore.subscribe(cacheKey, entry => {
-        callback(entry?.data as TData | undefined);
-      });
-    },
+    get: getData,
+    set: updateEntry,
+    remove: () => clientCacheStore.delete(cacheKey),
+    invalidate: invalidateEntry,
+    isStale: checkStaleStatus,
+    subscribe: subscribeToChanges,
   };
 };
 
@@ -85,6 +86,5 @@ export const clientCache = <TData = unknown>(
   }
 
   const cacheKey = generateCacheKeyFromDefinition(definition);
-
-  return createCacheHandler(cacheKey);
+  return createCacheHandler<TData>(cacheKey);
 };
