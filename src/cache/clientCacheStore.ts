@@ -9,6 +9,7 @@ import {
 } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
+import { trackCache } from '@/utils/tracker';
 
 declare global {
   interface Window {
@@ -184,10 +185,30 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
   const entry = clientCacheState.clientCache.get(key) as
     | ClientCacheEntry<T>
     | undefined;
-  if (!entry) return null;
+  if (!entry) {
+    trackCache({
+      type: 'MISS',
+      key,
+      source: 'client',
+      size: clientCacheState.clientCache.size,
+      maxSize: clientCacheState.maxSize,
+    });
+    return null;
+  }
 
   const updatedEntry = updateLastAccessed(entry);
   clientCacheState.clientCache.set(key, updatedEntry);
+
+  trackCache({
+    type: 'HIT',
+    key,
+    source: 'client',
+    clientTags: entry.clientTags,
+    clientTTL: entry.clientRevalidate,
+    size: clientCacheState.clientCache.size,
+    maxSize: clientCacheState.maxSize,
+  });
+
   return updatedEntry;
 };
 

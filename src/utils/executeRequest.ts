@@ -1,5 +1,6 @@
 import { isNextFetchError } from '@/errors/errorFactory';
 import type { InternalNextFetchResponse } from '@/types/internal';
+import { trackRequestError } from '@/utils/tracker';
 
 import {
   validateUrl,
@@ -45,6 +46,13 @@ export const executeRequest = async <T>(
     return processResponse<T>(response, request.method);
   } catch (error) {
     cleanup();
+
+    trackRequestError({
+      url: request.url,
+      method: request.method,
+      duration: 0,
+      error: error instanceof Error ? error.message : String(error),
+    });
 
     if (isNextFetchError(error)) {
       throw error;

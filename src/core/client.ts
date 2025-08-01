@@ -1,3 +1,5 @@
+import { performance } from 'perf_hooks';
+
 import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import {
   extractClientCacheStateFromHeaders,
@@ -28,6 +30,12 @@ import {
   setupHeaders,
   setupTimeout,
 } from '@/utils';
+import {
+  trackCache,
+  trackRequestError,
+  trackRequestStart,
+  trackRequestSuccess,
+} from '@/utils/tracker';
 
 import {
   createRequestInterceptor,
@@ -159,6 +167,9 @@ const executeRequestWithLifecycle = async <T>(
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
 ): Promise<InternalNextFetchResponse<T | null | undefined>> => {
+  const startTime = performance.now();
+  trackRequestStart({ url, method: config.method || 'GET' });
+
   const requestInterceptors = requestInterceptor.getByNames(interceptors);
   const modifiedConfig = await applyRequestInterceptors(
     config,
@@ -174,6 +185,26 @@ const executeRequestWithLifecycle = async <T>(
 
   const request = new Request(url, modifiedConfig);
   const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
+
+  if (isServerEnvironment()) {
+    const cacheStatus = response.headers.get('x-nextjs-cache');
+    const ageHeader = response.headers.get('age');
+    const age = ageHeader ? parseInt(ageHeader, 10) : undefined;
+    const revalidate = modifiedConfig.next?.revalidate as number | undefined;
+
+    if (cacheStatus) {
+      trackCache({
+        type: cacheStatus as 'HIT' | 'MISS',
+        key: `${modifiedConfig.method?.toUpperCase() || 'GET'} ${url}`,
+        source: 'server',
+        serverTags: modifiedConfig.next?.tags,
+        serverTTL:
+          revalidate !== undefined && age !== undefined
+            ? revalidate - age
+            : undefined,
+      });
+    }
+  }
 
   if (isServerEnvironment() && response.data && modifiedConfig.headers) {
     const headers = new Headers(modifiedConfig.headers);
@@ -222,6 +253,28 @@ const executeRequestWithLifecycle = async <T>(
     responseWithConfig,
     responseInterceptors
   );
+
+  const duration = performance.now() - startTime;
+
+  if (finalResponse.ok) {
+    const responseSize = finalResponse.data
+      ? JSON.stringify(finalResponse.data).length
+      : 0;
+    trackRequestSuccess({
+      url,
+      method: config.method || 'GET',
+      duration,
+      status: finalResponse.status,
+      responseSize,
+    });
+  } else {
+    trackRequestError({
+      url,
+      method: config.method || 'GET',
+      duration,
+      error: `HTTP ${finalResponse.status}`,
+    });
+  }
 
   if (isClientEnvironment() && finalResponse.status === 304) {
     const cacheKey = `${config.method?.toUpperCase() || 'GET'}:${url}`;
