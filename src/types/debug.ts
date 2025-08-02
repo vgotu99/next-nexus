@@ -1,4 +1,6 @@
-export type DebugLevel = 'error' | 'warn' | 'info' | 'debug' | 'trace';
+import { CacheRevalidateTime } from '@/types/cache';
+
+export type DebugLevel = 'error' | 'warn' | 'info' | 'debug';
 
 export type LogContext = 'Cache' | 'Request' | 'Core' | 'Error' | 'Provider';
 
@@ -9,18 +11,32 @@ export interface DebugConfig {
   maxBodySize?: number;
 }
 
-export type CacheEventType = 'HIT' | 'MISS';
+export type CacheEventType =
+  | 'HIT'
+  | 'MISS'
+  | 'SET'
+  | 'UPDATE'
+  | 'DELETE'
+  | 'CLEAR';
+
+export type CacheSource =
+  | 'client-fetch'
+  | 'client-manual'
+  | 'client-hydration'
+  | 'server';
+
 export type RequestEventType = 'START' | 'SUCCESS' | 'ERROR' | 'TIMEOUT';
 
 export interface CacheEvent {
   type: CacheEventType;
   key: string;
   timestamp: number;
-  source: 'client' | 'server';
-  clientTags?: string[];
-  serverTags?: string[];
-  clientTTL?: number;
-  serverTTL?: number;
+  source: CacheSource;
+  duration?: number;
+  status?: number;
+  tags?: string[];
+  revalidate?: CacheRevalidateTime;
+  ttl?: number;
   size?: number;
   maxSize?: number;
 }
