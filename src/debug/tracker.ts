@@ -26,47 +26,56 @@ interface PublishRequestErrorParams {
   error: string;
 }
 
+interface PublishRequestTimeoutParams {
+  url: string;
+  method: string;
+  duration: number;
+}
+
 const cacheEventStream = createEventStream<CacheEvent>();
 const requestEventStream = createEventStream<RequestEvent>();
 
-const formatClientCacheDetails = (event: CacheEvent): string[] => {
-  const details: string[] = [];
-  if (event.clientTags?.length) {
-    details.push(`- Tags: [${event.clientTags.join(', ')}]`);
-  }
-  if (event.clientTTL !== undefined) {
-    details.push(`- TTL: ${event.clientTTL}s remaining`);
-  }
-  if (event.size !== undefined && event.maxSize !== undefined) {
-    details.push(`- Size: ${event.size}/${event.maxSize}`);
-  }
-  return details;
-};
-
-const formatServerCacheDetails = (event: CacheEvent): string[] => {
-  const details: string[] = [];
-  if (event.serverTTL !== undefined) {
-    details.push(`- TTL: ${event.serverTTL}s remaining`);
-  }
-  if (event.serverTags?.length) {
-    details.push(`- Req. Tags: [${event.serverTags.join(', ')}]`);
-  }
-  return details;
-};
-
 const logCacheEvent = (event: CacheEvent): void => {
-  const { type, key, source } = event;
-  const icon = source === 'client' ? (type === 'HIT' ? '🔵' : '⚪️') : '⚫️';
-  const sourceName = source === 'client' ? 'CLIENT' : 'SERVER';
+  const {
+    type,
+    key,
+    source,
+    duration,
+    status,
+    tags,
+    revalidate,
+    ttl,
+    size,
+    maxSize,
+  } = event;
 
-  const baseMessage = `${icon} [${sourceName} CACHE | ${type}] ${key}`;
-  const details =
-    source === 'client'
-      ? formatClientCacheDetails(event)
-      : formatServerCacheDetails(event);
+  const sourceName = source.toUpperCase();
 
-  const message =
-    details.length > 0 ? `${baseMessage}\n${details.join('\n')}` : baseMessage;
+  const details: string[] = [];
+
+  if (duration !== undefined) {
+    details.push(`duration: ${duration}ms`);
+  }
+  if (status !== undefined) {
+    details.push(`status: ${status}`);
+  }
+  if (tags?.length) {
+    details.push(`tags: [${tags.map(tag => `'${tag}'`).join(', ')}]`);
+  }
+  if (revalidate !== undefined) {
+    details.push(`revalidate: ${revalidate}s`);
+  }
+  if (ttl !== undefined) {
+    details.push(`ttl: ${ttl}s`);
+  }
+  if (size !== undefined && maxSize !== undefined) {
+    details.push(`size: ${size}/${maxSize}`);
+  }
+
+  const message = [
+    `[${sourceName}] [${type}] ${key}`,
+    ...(details.length > 0 ? [details.join(' | ')] : []),
+  ].join(' | ');
 
   logger.debug('Cache', message);
 };
@@ -124,10 +133,21 @@ const publishRequestError = (params: PublishRequestErrorParams): void => {
   requestEventStream.publish(event);
 };
 
+const publishRequestTimeout = (params: PublishRequestTimeoutParams): void => {
+  const event = createRequestEvent({
+    type: 'TIMEOUT',
+    url: params.url,
+    method: params.method,
+    duration: params.duration,
+  });
+  requestEventStream.publish(event);
+};
+
 export const trackCache = publishCacheEvent;
 export const trackRequestStart = publishRequestStart;
 export const trackRequestSuccess = publishRequestSuccess;
 export const trackRequestError = publishRequestError;
+export const trackRequestTimeout = publishRequestTimeout;
 
 export const subscribeToCacheEvents = cacheEventStream.subscribe;
 export const subscribeToRequestEvents = requestEventStream.subscribe;
