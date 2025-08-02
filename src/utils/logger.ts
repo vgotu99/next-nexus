@@ -1,5 +1,5 @@
 import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
-import { debugConfig } from '@/debug';
+import { getDebugConfig } from '@/debug/config';
 import type { DebugLevel, LogContext } from '@/types/debug';
 
 const LOG_LEVELS: Record<DebugLevel, number> = {
@@ -7,15 +7,15 @@ const LOG_LEVELS: Record<DebugLevel, number> = {
   warn: 1,
   info: 2,
   debug: 3,
-  trace: 4,
 };
 
 const shouldLog = (level: DebugLevel, context?: LogContext): boolean => {
-  if (!debugConfig.enabled) return false;
+  const config = getDebugConfig();
+  if (!config.enabled) return false;
 
-  if (LOG_LEVELS[level] > LOG_LEVELS[debugConfig.level]) return false;
+  if (LOG_LEVELS[level] > LOG_LEVELS[config.level]) return false;
 
-  if (debugConfig.filter && context && !debugConfig.filter.includes(context))
+  if (config.filter && context && !config.filter.includes(context))
     return false;
 
   return true;
@@ -45,7 +45,7 @@ const formatLog = (
 
 const summarizeLargeData = (
   data: unknown,
-  maxSize: number = debugConfig.maxBodySize || 1024 * 1024
+  maxSize: number = getDebugConfig().maxBodySize || 1024 * 1024
 ): unknown => {
   if (typeof data === 'string' && data.length > maxSize) {
     return {
@@ -121,21 +121,9 @@ export const logDebug = (
   console.log(formattedMessage);
 };
 
-export const logTrace = (
-  context: LogContext,
-  message: string,
-  data?: unknown
-): void => {
-  if (!shouldLog('trace', context)) return;
-
-  const formattedMessage = prepareLogMessage('trace', context, message, data);
-  console.log(formattedMessage);
-};
-
 export const logger = {
   error: logError,
   warn: logWarn,
   info: logInfo,
   debug: logDebug,
-  trace: logTrace,
 };
