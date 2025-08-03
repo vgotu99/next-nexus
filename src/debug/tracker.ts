@@ -1,9 +1,9 @@
-import type { CacheEvent, RequestEvent } from '@/types/debug';
 import {
   createEventStream,
   createCacheEvent,
   createRequestEvent,
-} from '@/utils/eventStream';
+} from '@/debug/eventStream';
+import type { CacheEvent, RequestEvent } from '@/types/debug';
 import { logger } from '@/utils/logger';
 
 interface PublishRequestStartParams {
