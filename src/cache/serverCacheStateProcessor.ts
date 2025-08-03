@@ -35,21 +35,30 @@ export const parseCacheState = (
   }
 };
 
-export const validateCacheMetadata = (
+export const getValidCacheMetadataForSkip = (
   metadata: ClientCacheMetadata[]
 ): ClientCacheMetadata[] => {
   const currentTime = getCurrentTimestamp();
-
   return metadata.filter(item => {
     if (!item.key || typeof item.expiresAt !== 'number') {
       return false;
     }
+    return item.expiresAt === Infinity || item.expiresAt > currentTime;
+  });
+};
 
-    if (item.expiresAt !== Infinity && item.expiresAt <= currentTime) {
+export const getCacheMetadataForETag = (
+  metadata: ClientCacheMetadata[]
+): ClientCacheMetadata[] => {
+  const currentTime = getCurrentTimestamp();
+  return metadata.filter(item => {
+    if (!item.key || typeof item.expiresAt !== 'number') {
       return false;
     }
-
-    return true;
+    if (item.etag) {
+      return true;
+    }
+    return item.expiresAt === Infinity || item.expiresAt > currentTime;
   });
 };
 
@@ -62,22 +71,13 @@ export const extractClientCacheState = (
 
   try {
     const headerValue = request.headers.get(CLIENT_CACHE_HEADER);
-
-    if (!headerValue) {
-      return [];
-    }
+    if (!headerValue) return [];
 
     const decoded = decodeFromHeader(headerValue);
-    if (!decoded) {
-      return [];
-    }
+    if (!decoded) return [];
 
     const parsed = parseCacheState(decoded);
-    if (!parsed) {
-      return [];
-    }
-
-    return validateCacheMetadata(parsed.metadata);
+    return parsed ? parsed.metadata : [];
   } catch (error) {
     console.warn('Failed to extract client cache state:', error);
     return [];
@@ -93,22 +93,13 @@ export const extractClientCacheStateFromHeaders = (
 
   try {
     const headerValue = headers.get(CLIENT_CACHE_HEADER);
-
-    if (!headerValue) {
-      return [];
-    }
+    if (!headerValue) return [];
 
     const decoded = decodeFromHeader(headerValue);
-    if (!decoded) {
-      return [];
-    }
+    if (!decoded) return [];
 
     const parsed = parseCacheState(decoded);
-    if (!parsed) {
-      return [];
-    }
-
-    return validateCacheMetadata(parsed.metadata);
+    return parsed ? parsed.metadata : [];
   } catch (error) {
     console.warn('Failed to extract client cache state from headers:', error);
     return [];
