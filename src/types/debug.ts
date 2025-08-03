@@ -14,6 +14,8 @@ export interface DebugConfig {
 export type CacheEventType =
   | 'HIT'
   | 'MISS'
+  | 'SKIP'
+  | 'MATCH'
   | 'SET'
   | 'UPDATE'
   | 'DELETE'
