@@ -1,6 +1,6 @@
+import { trackRequestError, trackRequestTimeout } from '@/debug/tracker';
 import { isNextFetchError } from '@/errors/errorFactory';
 import type { InternalNextFetchResponse } from '@/types/internal';
-import { trackRequestError } from '@/utils/tracker';
 
 import {
   validateUrl,
@@ -31,6 +31,7 @@ export const executeRequest = async <T>(
   request: Request,
   timeoutId?: NodeJS.Timeout
 ): Promise<InternalNextFetchResponse<T | undefined>> => {
+  const startTime = performance.now();
   const cleanup: TimeoutCleanup = () => cleanupTimeout(timeoutId);
 
   try {
@@ -47,12 +48,22 @@ export const executeRequest = async <T>(
   } catch (error) {
     cleanup();
 
-    trackRequestError({
-      url: request.url,
-      method: request.method,
-      duration: 0,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    const duration = performance.now() - startTime;
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      trackRequestTimeout({
+        url: request.url,
+        method: request.method,
+        duration,
+      });
+    } else {
+      trackRequestError({
+        url: request.url,
+        method: request.method,
+        duration,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     if (isNextFetchError(error)) {
       throw error;

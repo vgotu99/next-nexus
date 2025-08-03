@@ -1,5 +1,6 @@
 import { DEFAULT_CLIENT_CACHE_MAX_SIZE } from '@/constants/cache';
 import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
+import { trackCache } from '@/debug/tracker';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,
@@ -9,7 +10,6 @@ import {
 } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
-import { trackCache } from '@/utils/tracker';
 
 declare global {
   interface Window {
@@ -189,7 +189,7 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
     trackCache({
       type: 'MISS',
       key,
-      source: 'client',
+      source: 'client-fetch',
       size: clientCacheState.clientCache.size,
       maxSize: clientCacheState.maxSize,
     });
@@ -202,9 +202,10 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
   trackCache({
     type: 'HIT',
     key,
-    source: 'client',
-    clientTags: entry.clientTags,
-    clientTTL: entry.clientRevalidate,
+    source: `client-${entry.source}`,
+    tags: entry.clientTags,
+    revalidate: entry.clientRevalidate,
+    ttl: entry.clientRevalidate,
     size: clientCacheState.clientCache.size,
     maxSize: clientCacheState.maxSize,
   });
@@ -232,6 +233,17 @@ const set = <T = unknown>(
   );
 
   setClientCache(key, entry);
+
+  trackCache({
+    type: 'SET',
+    key,
+    source: `client-${source}`,
+    tags: clientTags,
+    revalidate: clientRevalidate,
+    ttl: clientRevalidate,
+    size: clientCacheState.clientCache.size,
+    maxSize: clientCacheState.maxSize,
+  });
 };
 
 const update = <T = unknown>(
@@ -240,7 +252,9 @@ const update = <T = unknown>(
 ): void => {
   if (!isClientEnvironment()) return;
 
-  const existingEntry = get(key);
+  const existingEntry = clientCacheState.clientCache.get(key) as
+    | ClientCacheEntry<T>
+    | undefined;
   if (!existingEntry) return;
 
   const newPartialEntry = {
@@ -256,13 +270,33 @@ const update = <T = unknown>(
   const updatedEntry = { ...existingEntry, ...newPartialEntry };
 
   setClientCache(key, updatedEntry);
+
+  trackCache({
+    type: 'UPDATE',
+    key,
+    source: `client-${updatedEntry.source}`,
+    tags: updatedEntry.clientTags,
+    revalidate: updatedEntry.clientRevalidate,
+    ttl: updatedEntry.clientRevalidate,
+    size: clientCacheState.clientCache.size,
+    maxSize: clientCacheState.maxSize,
+  });
 };
 
 const deleteKey = (key: string): boolean => {
   if (!isClientEnvironment()) return false;
 
   const deleted = clientCacheState.clientCache.delete(key);
-  if (deleted) notify(key, null);
+  if (deleted) {
+    notify(key, null);
+    trackCache({
+      type: 'DELETE',
+      key,
+      source: 'client-manual',
+      size: clientCacheState.clientCache.size,
+      maxSize: clientCacheState.maxSize,
+    });
+  }
 
   return deleted;
 };
@@ -275,6 +309,14 @@ const clear = (): void => {
   });
 
   clientCacheState.clientCache.clear();
+
+  trackCache({
+    type: 'CLEAR',
+    key: 'ALL',
+    source: 'client-manual',
+    size: clientCacheState.clientCache.size,
+    maxSize: clientCacheState.maxSize,
+  });
 };
 
 const keys = (): string[] => {

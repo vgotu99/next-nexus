@@ -1,11 +1,20 @@
 import { performance } from 'perf_hooks';
 
 import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import {
+  getValidCacheMetadataForSkip,
+  getCacheMetadataForETag,
   extractClientCacheStateFromHeaders,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
 import { createConditionalResponse } from '@/cache/serverETagValidator';
+import {
+  trackCache,
+  trackRequestError,
+  trackRequestStart,
+  trackRequestSuccess,
+} from '@/debug/tracker';
 import type {
   InterceptorHandler,
   NextFetchInstance,
@@ -30,12 +39,6 @@ import {
   setupHeaders,
   setupTimeout,
 } from '@/utils';
-import {
-  trackCache,
-  trackRequestError,
-  trackRequestStart,
-  trackRequestSuccess,
-} from '@/utils/tracker';
 
 import {
   createRequestInterceptor,
@@ -127,13 +130,18 @@ const shouldSkipRequest = (
     return false;
   }
 
-  const clientCacheState = extractClientCacheStateFromHeaders(headers);
-  if (clientCacheState.length === 0) {
+  const allClientCacheState = extractClientCacheStateFromHeaders(headers);
+  if (allClientCacheState.length === 0) {
     return false;
   }
 
-  const cacheKey = `${method.toUpperCase()}:${url}`;
-  return hasClientCacheEntryByCacheKey(clientCacheState, cacheKey);
+  const validClientCacheState = getValidCacheMetadataForSkip(allClientCacheState);
+  if (validClientCacheState.length === 0) {
+    return false;
+  }
+
+  const cacheKey = `${method.toUpperCase()}: ${url}`;
+  return hasClientCacheEntryByCacheKey(validClientCacheState, cacheKey);
 };
 
 const createInterceptorInterface = (
@@ -179,6 +187,15 @@ const executeRequestWithLifecycle = async <T>(
   if (isServerEnvironment() && modifiedConfig.headers) {
     const headers = new Headers(modifiedConfig.headers);
     if (shouldSkipRequest(headers, url, modifiedConfig.method)) {
+      trackCache({
+        type: 'SKIP',
+        key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+        source: 'server',
+        tags: modifiedConfig.client?.tags,
+        revalidate: modifiedConfig.client?.revalidate,
+        ttl: modifiedConfig.client?.revalidate || 0,
+      });
+
       return createCachedResponse<T>(url, modifiedConfig);
     }
   }
@@ -186,38 +203,28 @@ const executeRequestWithLifecycle = async <T>(
   const request = new Request(url, modifiedConfig);
   const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
 
-  if (isServerEnvironment()) {
-    const cacheStatus = response.headers.get('x-nextjs-cache');
-    const ageHeader = response.headers.get('age');
-    const age = ageHeader ? parseInt(ageHeader, 10) : undefined;
-    const revalidate = modifiedConfig.next?.revalidate as number | undefined;
-
-    if (cacheStatus) {
-      trackCache({
-        type: cacheStatus as 'HIT' | 'MISS',
-        key: `${modifiedConfig.method?.toUpperCase() || 'GET'} ${url}`,
-        source: 'server',
-        serverTags: modifiedConfig.next?.tags,
-        serverTTL:
-          revalidate !== undefined && age !== undefined
-            ? revalidate - age
-            : undefined,
-      });
-    }
-  }
-
   if (isServerEnvironment() && response.data && modifiedConfig.headers) {
     const headers = new Headers(modifiedConfig.headers);
-    const clientCacheMetadata = extractClientCacheStateFromHeaders(headers);
+    const allClientCacheState = extractClientCacheStateFromHeaders(headers);
+    const clientCacheMetadataForETag = getCacheMetadataForETag(allClientCacheState);
 
     const conditionalResult = createConditionalResponse(
       url,
       response.data,
       headers,
-      clientCacheMetadata
+      clientCacheMetadataForETag
     );
 
     if (conditionalResult.shouldSkip && conditionalResult.response) {
+      trackCache({
+        type: 'MATCH',
+        key: `${config.method?.toUpperCase() || 'GET'}: ${url}`,
+        source: 'server',
+        tags: modifiedConfig.client?.tags,
+        revalidate: modifiedConfig.client?.revalidate,
+        ttl: modifiedConfig.client?.revalidate || 0,
+      });
+
       const notModifiedResponse: InternalNextFetchResponse<
         T | null | undefined
       > = {
@@ -256,6 +263,29 @@ const executeRequestWithLifecycle = async <T>(
 
   const duration = performance.now() - startTime;
 
+  if (isServerEnvironment()) {
+    const cacheStatus = response.headers.get('x-nextjs-cache');
+    const ageHeader = response.headers.get('age');
+    const age = ageHeader ? parseInt(ageHeader, 10) : undefined;
+    const revalidate = modifiedConfig.next?.revalidate as number | undefined;
+
+    if (cacheStatus) {
+      trackCache({
+        type: cacheStatus as 'HIT' | 'MISS',
+        key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+        source: 'server',
+        duration: duration,
+        status: finalResponse.status,
+        tags: modifiedConfig.next?.tags,
+        revalidate: modifiedConfig.next?.revalidate,
+        ttl:
+          revalidate !== undefined && age !== undefined
+            ? revalidate - age
+            : undefined,
+      });
+    }
+  }
+
   if (finalResponse.ok) {
     const responseSize = finalResponse.data
       ? JSON.stringify(finalResponse.data).length
@@ -280,6 +310,17 @@ const executeRequestWithLifecycle = async <T>(
     const cacheKey = `${config.method?.toUpperCase() || 'GET'}:${url}`;
 
     extendCacheEntryTTL(cacheKey, config.client?.revalidate || 0);
+
+    trackCache({
+      type: 'UPDATE',
+      key: cacheKey,
+      source: 'client-fetch',
+      tags: config.client?.tags,
+      revalidate: config.client?.revalidate,
+      ttl: config.client?.revalidate || 0,
+      size: clientCacheStore.size(),
+      maxSize: clientCacheStore.getStats().maxSize,
+    });
   }
 
   return finalResponse;

@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { useNextFetchContext } from '@/context/NextFetchContext';
-import type { GetNextFetchDefinition, NextFetchDefinition } from '@/types/definition';
+import type { ClientCacheEntry } from '@/types/cache';
+import type {
+  GetNextFetchDefinition,
+  NextFetchDefinition,
+} from '@/types/definition';
 import type {
   NextQueryState,
   UseNextQueryOptions,
@@ -158,8 +162,8 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     }
   }, [definition, cacheKey, enabled, select, nextFetchInstance]);
 
-  const syncStateWithCache = useCallback((): void => {
-    if (!enabled) return;
+  const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
+    if (!enabled) return null;
 
     const cachedEntry = clientCacheStore.get<TData>(cacheKey);
 
@@ -171,19 +175,19 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     } else {
       dispatch({ type: 'RESET' });
     }
+
+    return cachedEntry;
   }, [cacheKey, enabled, select]);
 
   const initializeQuery = useCallback((): void => {
     if (!enabled) return;
 
-    syncStateWithCache();
-
-    const cachedEntry = clientCacheStore.get<TData>(cacheKey);
+    const cachedEntry = syncStateWithCache();
 
     if (!cachedEntry || isCacheEntryExpired(cachedEntry)) {
       refetch();
     }
-  }, [cacheKey, enabled, refetch, syncStateWithCache]);
+  }, [enabled, refetch, syncStateWithCache]);
 
   useEffect(() => {
     if (!enabled) {
@@ -197,7 +201,10 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
   useEffect(() => {
     if (!enabled) return;
 
-    const unsubscribe = clientCacheStore.subscribe(cacheKey, syncStateWithCache);
+    const unsubscribe = clientCacheStore.subscribe(
+      cacheKey,
+      syncStateWithCache
+    );
 
     return unsubscribe;
   }, [cacheKey, enabled, syncStateWithCache]);
