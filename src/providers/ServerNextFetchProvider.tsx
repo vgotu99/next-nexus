@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 
 import { requestCache } from '@/cache/requestCache';
 import {
-  extractClientCacheStateFromHeaders,
+  extractClientCacheFromHeaders,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
 import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
-import type { CacheEntry, HydrationData } from '@/types';
+import type { ClientCacheEntry, HydrationData } from '@/types';
 import { getCurrentTimestamp } from '@/utils';
 
 type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'instance'>;
@@ -24,12 +24,12 @@ const collectCacheData = async (): Promise<HydrationData> => {
     const keys = await requestCache.keys();
 
     const clientCacheState: ReturnType<
-      typeof extractClientCacheStateFromHeaders
+      typeof extractClientCacheFromHeaders
     > = [];
 
     const hydrationEntries = await Promise.all(
       keys.map(async key => {
-        const cachedEntry = await requestCache.get<CacheEntry>(key);
+        const cachedEntry = await requestCache.get<ClientCacheEntry>(key);
 
         const entry = cachedEntry;
 
@@ -49,6 +49,7 @@ const collectCacheData = async (): Promise<HydrationData> => {
             clientRevalidate: entry.clientRevalidate,
             clientTags: entry.clientTags,
             serverTags: entry.serverTags,
+            etag: entry.etag,
           },
         ] as const;
       })

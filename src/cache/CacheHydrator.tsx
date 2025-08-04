@@ -40,6 +40,7 @@ const createHydrationEntry = (key: string, value: HydrationData[string]) => ({
   clientRevalidate: value.clientRevalidate,
   clientTags: value.clientTags,
   serverTags: value.serverTags,
+  etag: value.etag,
 });
 
 const hydrateClientCache = (hydrationData: HydrationData): number => {
@@ -49,14 +50,15 @@ const hydrateClientCache = (hydrationData: HydrationData): number => {
     );
 
     entries.forEach(
-      ({ key, data, clientRevalidate, clientTags, serverTags }) => {
+      ({ key, data, clientRevalidate, clientTags, serverTags, etag }) => {
         clientCacheStore.set(
           key,
           data,
           clientRevalidate,
           clientTags,
           serverTags,
-          'hydration'
+          'hydration',
+          etag
         );
       }
     );

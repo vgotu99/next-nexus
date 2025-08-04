@@ -71,14 +71,16 @@ const createClientCacheEntry = <T>(
   clientRevalidate: number = 0,
   clientTags: string[] = [],
   serverTags: string[] = [],
-  source: ClientCacheEntry['source']
+  source: ClientCacheEntry['source'],
+  etag?: string
 ): ClientCacheEntry<T> => {
   const baseEntry = createCacheEntry(
     data,
     key,
     clientRevalidate,
     clientTags,
-    serverTags
+    serverTags,
+    etag
   );
 
   return {
@@ -219,7 +221,8 @@ const set = <T = unknown>(
   clientRevalidate: number = 0,
   clientTags: string[] = [],
   serverTags: string[] = [],
-  source: ClientCacheEntry['source']
+  source: ClientCacheEntry['source'],
+  etag?: string
 ): void => {
   if (!isClientEnvironment()) return;
 
@@ -229,7 +232,8 @@ const set = <T = unknown>(
     clientRevalidate,
     clientTags,
     serverTags,
-    source
+    source,
+    etag
   );
 
   setClientCache(key, entry);
