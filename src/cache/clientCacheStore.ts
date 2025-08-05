@@ -115,10 +115,7 @@ const filterByTags = (
 
   return Array.from(clientCache.entries())
     .filter(([, entry]) => {
-      const allEntryTags = [
-        ...(entry.clientTags || []),
-        ...(entry.serverTags || []),
-      ];
+      const allEntryTags = entry.clientTags || [];
       return hasCommonTags(allEntryTags, normalizedTags);
     })
     .map(([key]) => key);
