@@ -1,10 +1,6 @@
 import type { ReactNode } from 'react';
 
 import { requestCache } from '@/cache/requestCache';
-import {
-  extractClientCacheFromHeaders,
-  hasClientCacheEntryByCacheKey,
-} from '@/cache/serverCacheStateProcessor';
 import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
 import type { ClientCacheEntry, HydrationData } from '@/types';
 import { getCurrentTimestamp } from '@/utils';
@@ -23,10 +19,6 @@ const collectCacheData = async (): Promise<HydrationData> => {
   try {
     const keys = await requestCache.keys();
 
-    const clientCacheState: ReturnType<
-      typeof extractClientCacheFromHeaders
-    > = [];
-
     const hydrationEntries = await Promise.all(
       keys.map(async key => {
         const cachedEntry = await requestCache.get<ClientCacheEntry>(key);
@@ -34,10 +26,6 @@ const collectCacheData = async (): Promise<HydrationData> => {
         const entry = cachedEntry;
 
         if (!entry) {
-          return null;
-        }
-
-        if (hasClientCacheEntryByCacheKey(clientCacheState, key)) {
           return null;
         }
 
