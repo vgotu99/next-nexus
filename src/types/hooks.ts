@@ -1,11 +1,8 @@
-import type { NextFetchInstance } from '@/types/instance';
-
 export interface UseNextQueryOptions<TData = unknown, TSelectedData = TData> {
   enabled?: boolean;
   select?: (data: TData) => TSelectedData;
   refetchOnWindowFocus?: boolean;
   refetchOnMount?: boolean;
-  instance?: NextFetchInstance;
 }
 
 export interface UseNextQueryResult<TSelectedData = unknown> {
@@ -45,7 +42,6 @@ export interface UseNextMutationOptions<
     variables: TVariables,
     context: TContext | undefined
   ) => void | Promise<void>;
-  instance?: NextFetchInstance;
 }
 
 export interface UseNextMutationResult<

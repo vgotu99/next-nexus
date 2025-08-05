@@ -1,4 +1,5 @@
 import { MAX_CACHE_KEY_LENGTH } from '@/constants/cache';
+import { GetNextFetchDefinition } from '@/types';
 import type { CacheKeyOptions, CacheEntry } from '@/types/cache';
 import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
 
@@ -23,6 +24,21 @@ export const generateCacheKey = ({
   const tagsComponent = buildTagsComponent(clientTags, serverTags);
 
   return [baseKey, tagsComponent].filter(Boolean).join('|');
+};
+
+export const generateCacheKeyFromDefinition = (
+  definition: GetNextFetchDefinition
+): string => {
+  const { method, endpoint, client, server, baseURL } = definition;
+
+  const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
+
+  return generateCacheKey({
+    endpoint: url,
+    method,
+    clientTags: client?.tags,
+    serverTags: server?.tags,
+  });
 };
 
 export const isCacheEntryExpired = (entry: CacheEntry): boolean =>
@@ -55,7 +71,7 @@ export const createCacheEntry = <T>(
 ): CacheEntry<T> => {
   const now = getCurrentTimestamp();
   const expiresAt =
-    clientRevalidate > 0 ? now + clientRevalidate * 1000 : now - 1000; // TTL이 0이면 1초 전으로 설정하여 즉시 만료
+    clientRevalidate > 0 ? now + clientRevalidate * 1000 : now - 1000;
 
   return {
     data,

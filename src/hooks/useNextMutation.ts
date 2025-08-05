@@ -2,7 +2,7 @@
 
 import { useCallback, useReducer } from 'react';
 
-import { useNextFetchContext } from '@/context/NextFetchContext';
+import { nextFetch } from '@/core/client';
 import type { NextFetchDefinition } from '@/types/definition';
 import type {
   NextMutationState,
@@ -79,10 +79,7 @@ export const useNextMutation = <
     );
   }
 
-  const { onMutate, onSuccess, onError, onSettled, instance } = options;
-
-  const { instance: defaultInstance } = useNextFetchContext();
-  const nextFetchInstance = instance || defaultInstance;
+  const { onMutate, onSuccess, onError, onSettled } = options;
 
   const [state, dispatch] = useReducer(mutationReducer<TData, TError>, {
     data: undefined,
@@ -110,7 +107,7 @@ export const useNextMutation = <
       }> => {
         try {
           const definition = mutationDefinitionFactory(variables);
-          const response = await nextFetchInstance(definition);
+          const response = await nextFetch(definition);
           const data = response.data;
 
           dispatch({ type: 'SET_SUCCESS', payload: data });
@@ -150,7 +147,6 @@ export const useNextMutation = <
       onError,
       onSettled,
       mutationDefinitionFactory,
-      nextFetchInstance,
     ]
   );
 

@@ -1,11 +1,11 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import type { CacheHandler } from '@/types/cache';
-import type {
-  GetNextFetchDefinition,
-  NextFetchDefinition,
-} from '@/types/definition';
-import { generateCacheKey, isCacheEntryExpired } from '@/utils/cacheUtils';
+import type { NextFetchDefinition } from '@/types/definition';
+import {
+  generateCacheKeyFromDefinition,
+  isCacheEntryExpired,
+} from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
 
 const validateGetDefinition = (
@@ -17,18 +17,6 @@ const validateGetDefinition = (
         'Using it with mutation definitions may not work as expected.'
     );
   }
-};
-
-const generateCacheKeyFromDefinition = (
-  definition: GetNextFetchDefinition<unknown>
-): string => {
-  const { method, endpoint, options } = definition;
-  return generateCacheKey({
-    endpoint,
-    method,
-    clientTags: options?.client?.tags,
-    serverTags: options?.server?.tags,
-  });
 };
 
 const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {

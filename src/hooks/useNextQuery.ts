@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { useNextFetchContext } from '@/context/NextFetchContext';
+import { HEADERS } from '@/constants/cache';
+import { nextFetch } from '@/core/client';
 import type { ClientCacheEntry } from '@/types/cache';
 import type {
   GetNextFetchDefinition,
@@ -14,8 +15,10 @@ import type {
   UseNextQueryOptions,
   UseNextQueryResult,
 } from '@/types/hooks';
-import type { NextFetchInstance } from '@/types/instance';
-import { generateCacheKey, isCacheEntryExpired } from '@/utils/cacheUtils';
+import {
+  generateCacheKeyFromDefinition,
+  isCacheEntryExpired,
+} from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
 
 type QueryAction<TData> =
@@ -66,39 +69,27 @@ const queryReducer = <TData>(
   return handlers[action.type]?.() || state;
 };
 
-const createCacheKeyFromDefinition = (
-  definition: GetNextFetchDefinition
-): string => {
-  const { method, endpoint, options } = definition;
-  const { client, server } = options || {};
-
-  return generateCacheKey({
-    endpoint,
-    method,
-    clientTags: client?.tags,
-    serverTags: server?.tags,
-  });
-};
-
 const fetchData = async <TData>(
   definition: GetNextFetchDefinition<TData>,
-  cacheKey: string,
-  nextFetchInstance: NextFetchInstance
+  cacheKey: string
 ): Promise<TData> => {
-  const { options } = definition;
+  const { client, server } = definition;
 
-  const { data } = await nextFetchInstance(definition);
+  const response = await nextFetch(definition);
+
+  const etag = response.headers.get(HEADERS.RESPONSE_ETAG) || undefined;
 
   clientCacheStore.set(
     cacheKey,
-    data,
-    options?.client?.revalidate,
-    options?.client?.tags,
-    options?.server?.tags,
-    'fetch'
+    response.data,
+    client?.revalidate,
+    client?.tags,
+    server?.tags,
+    'fetch',
+    etag
   );
 
-  return data;
+  return response.data;
 };
 
 export const useNextQuery = <TData = unknown, TSelectedData = TData>(
@@ -122,11 +113,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     select,
     refetchOnWindowFocus = true,
     refetchOnMount = true,
-    instance,
   } = options;
-
-  const { instance: defaultInstance } = useNextFetchContext();
-  const nextFetchInstance = instance || defaultInstance;
 
   const [state, dispatch] = useReducer(queryReducer<TSelectedData>, {
     data: undefined,
@@ -137,7 +124,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
   });
 
   const cacheKey = useMemo(
-    () => createCacheKeyFromDefinition(definition),
+    () => generateCacheKeyFromDefinition(definition),
     [definition]
   );
 
@@ -147,7 +134,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     dispatch({ type: 'SET_PENDING', payload: true });
 
     try {
-      const data = await fetchData(definition, cacheKey, nextFetchInstance);
+      const data = await fetchData(definition, cacheKey);
       const selectedData = select ? select(data) : (data as TSelectedData);
 
       dispatch({ type: 'SET_DATA', payload: selectedData });
@@ -160,7 +147,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
         payload: new Error(`useNextQuery failed: ${errorMessage}`),
       });
     }
-  }, [definition, cacheKey, enabled, select, nextFetchInstance]);
+  }, [definition, cacheKey, enabled, select]);
 
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
     if (!enabled) return null;
