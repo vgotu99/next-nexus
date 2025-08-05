@@ -66,26 +66,22 @@ const subscribe = <T = unknown>(
 };
 
 const createClientCacheEntry = <T>(
-  data: T,
   key: string,
-  clientRevalidate: number = 0,
-  clientTags: string[] = [],
-  serverTags: string[] = [],
-  source: ClientCacheEntry['source'],
-  etag?: string
+  entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'>
 ): ClientCacheEntry<T> => {
   const baseEntry = createCacheEntry(
-    data,
+    entry.data,
     key,
-    clientRevalidate,
-    clientTags,
-    serverTags,
-    etag
+    entry.clientRevalidate,
+    entry.clientTags,
+    entry.serverTags,
+    entry.etag
   );
 
   return {
     ...baseEntry,
-    source,
+    source: entry.source,
+    headers: entry.headers,
     lastAccessed: getCurrentTimestamp(),
   };
 };
@@ -217,36 +213,26 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
 
 const set = <T = unknown>(
   key: string,
-  data: T,
-  clientRevalidate: number = 0,
-  clientTags: string[] = [],
-  serverTags: string[] = [],
-  source: ClientCacheEntry['source'],
-  etag?: string
+  entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'>
 ): void => {
   if (!isClientEnvironment()) return;
 
   const isUpdated = clientCacheState.clientCache.has(key);
 
-  const entry = createClientCacheEntry(
-    data,
+  const clientCacheEntry = createClientCacheEntry(
     key,
-    clientRevalidate,
-    clientTags,
-    serverTags,
-    source,
-    etag
+    entry
   );
 
-  setClientCache(key, entry);
+  setClientCache(key, clientCacheEntry);
 
   trackCache({
     type: isUpdated ? 'UPDATE' : 'SET',
     key,
-    source: `client-${source}`,
-    tags: clientTags,
-    revalidate: clientRevalidate,
-    ttl: clientRevalidate,
+    source: `client-${clientCacheEntry.source}`,
+    tags: clientCacheEntry.clientTags,
+    revalidate: clientCacheEntry.clientRevalidate,
+    ttl: clientCacheEntry.clientRevalidate,
     size: clientCacheState.clientCache.size,
     maxSize: clientCacheState.maxSize,
   });

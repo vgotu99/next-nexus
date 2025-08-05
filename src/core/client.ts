@@ -300,6 +300,16 @@ const executeRequestWithLifecycle = async <T>(
   if (isServerEnvironment() && responseWithETag.data) {
     const etag = responseWithETag.headers.get(HEADERS.RESPONSE_ETAG);
 
+    const cachedResponseHeaders = modifiedConfig.client?.cachedHeaders?.reduce<
+      Record<string, string>
+    >((acc, headerName) => {
+      const headerValue = responseWithETag.headers.get(headerName);
+      if (headerValue !== null) {
+        acc[headerName] = headerValue;
+      }
+      return acc;
+    }, {});
+
     if (etag) {
       const cacheKey = generateCacheKey({
         endpoint: url,
@@ -315,6 +325,7 @@ const executeRequestWithLifecycle = async <T>(
         clientTags: modifiedConfig.client?.tags || [],
         serverTags: modifiedConfig.server?.tags || [],
         etag,
+        headers: cachedResponseHeaders,
       };
 
       await requestCache.set(cacheKey, hydrationCacheEntry);

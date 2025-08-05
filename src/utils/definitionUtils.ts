@@ -1,3 +1,4 @@
+import type { NextFetchRequestConfig } from '@/types';
 import type {
   NextFetchDefinition,
   CreateNextFetchDefinitionConfig,
@@ -23,7 +24,7 @@ const validateConfig = (definition: NextFetchDefinition): void => {
 };
 
 export const createNextFetchDefinition = (
-  defaultConfig: CreateNextFetchDefinitionConfig
+  defaultConfig: NextFetchRequestConfig
 ): DefinitionCreator => {
   return <TResponse = unknown>(config: CreateNextFetchDefinitionConfig) => {
     const { headers: defaultConfigHeaders, ...restDefaultConfig } =

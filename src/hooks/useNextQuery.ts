@@ -22,7 +22,7 @@ import {
 import { isGetDefinition } from '@/utils/definitionUtils';
 
 type QueryAction<TData> =
-  | { type: 'SET_DATA'; payload: TData }
+  | { type: 'SET_RESULT'; payload: { data: TData; headers: Headers } }
   | { type: 'SET_ERROR'; payload: Error }
   | { type: 'SET_PENDING'; payload: boolean }
   | { type: 'RESET' };
@@ -31,65 +31,77 @@ const queryReducer = <TData>(
   state: NextQueryState<TData>,
   action: QueryAction<TData>
 ): NextQueryState<TData> => {
-  const handlers: Record<
-    QueryAction<TData>['type'],
-    () => NextQueryState<TData>
-  > = {
-    SET_DATA: () => ({
-      ...state,
-      data: (action as { type: 'SET_DATA'; payload: TData }).payload,
-      error: null,
-      isPending: false,
-      isSuccess: true,
-      isError: false,
-    }),
-    SET_ERROR: () => ({
-      ...state,
-      error: (action as { type: 'SET_ERROR'; payload: Error }).payload,
-      isPending: false,
-      isSuccess: false,
-      isError: true,
-    }),
-    SET_PENDING: () => ({
-      ...state,
-      error: null,
-      isPending: (action as { type: 'SET_PENDING'; payload: boolean }).payload,
-      isSuccess: false,
-      isError: false,
-    }),
-    RESET: () => ({
-      data: undefined,
-      error: null,
-      isPending: false,
-      isSuccess: false,
-      isError: false,
-    }),
-  };
-
-  return handlers[action.type]?.() || state;
+  switch (action.type) {
+    case 'SET_RESULT':
+      return {
+        ...state,
+        data: action.payload.data,
+        headers: action.payload.headers,
+        error: null,
+        isPending: false,
+        isSuccess: true,
+        isError: false,
+      };
+    case 'SET_ERROR':
+      return {
+        ...state,
+        data: undefined,
+        headers: undefined,
+        error: action.payload,
+        isPending: false,
+        isSuccess: false,
+        isError: true,
+      };
+    case 'SET_PENDING':
+      return {
+        ...state,
+        isPending: action.payload,
+        isSuccess: false,
+        isError: false,
+      };
+    case 'RESET':
+      return {
+        data: undefined,
+        headers: undefined,
+        error: null,
+        isPending: false,
+        isSuccess: false,
+        isError: false,
+      };
+    default:
+      return state;
+  }
 };
 
 const fetchData = async <TData>(
   definition: GetNextFetchDefinition<TData>,
   cacheKey: string
-): Promise<TData> => {
-  const { client, server } = definition;
-
+): Promise<{ data: TData; headers: Headers }> => {
   const response = await nextFetch(definition);
 
   const etag = response.headers.get(HEADERS.RESPONSE_ETAG) || undefined;
 
-  clientCacheStore.set(
-    cacheKey,
-    response.data,
-    client?.revalidate,
-    client?.tags,
-    server?.tags,
-    'fetch',
-    etag
-  );
+  const cachedResponseHeaders = definition.client?.cachedHeaders?.reduce<
+    Record<string, string>
+  >((acc, headerName) => {
+    const headerValue = response.headers.get(headerName);
+    if (headerValue !== null) {
+      acc[headerName] = headerValue;
+    }
+    return acc;
+  }, {});
 
-  return response.data;
+  clientCacheStore.set(cacheKey, {
+    data: response.data,
+    clientRevalidate: definition.client?.revalidate,
+    clientTags: definition.client?.tags,
+    serverTags: definition.server?.tags,
+    source: 'fetch',
+    etag,
+    headers: cachedResponseHeaders,
+  });
+
+  return { data: response.data, headers: response.headers };
 };
 
 export const useNextQuery = <TData = unknown, TSelectedData = TData>(
@@ -115,8 +127,9 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     refetchOnMount = true,
   } = options;
 
-  const [state, dispatch] = useReducer(queryReducer<TSelectedData>, {
+  const [state, dispatch] = useReducer(queryReducer<TData>, {
     data: undefined,
+    headers: undefined,
     error: null,
     isPending: false,
     isSuccess: false,
@@ -134,10 +147,8 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     dispatch({ type: 'SET_PENDING', payload: true });
 
     try {
-      const data = await fetchData(definition, cacheKey);
-      const selectedData = select ? select(data) : (data as TSelectedData);
-
-      dispatch({ type: 'SET_DATA', payload: selectedData });
+      const { data, headers } = await fetchData(definition, cacheKey);
+      dispatch({ type: 'SET_RESULT', payload: { data, headers } });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'An unknown error occurred';
@@ -147,7 +158,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
         payload: new Error(`useNextQuery failed: ${errorMessage}`),
       });
     }
-  }, [definition, cacheKey, enabled, select]);
+  }, [definition, cacheKey, enabled]);
 
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
     if (!enabled) return null;
@@ -155,16 +166,19 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     const cachedEntry = clientCacheStore.get<TData>(cacheKey);
 
     if (cachedEntry) {
-      const dataToDispatch = select
-        ? select(cachedEntry.data)
-        : (cachedEntry.data as unknown as TSelectedData);
-      dispatch({ type: 'SET_DATA', payload: dataToDispatch });
+      dispatch({
+        type: 'SET_RESULT',
+        payload: {
+          data: cachedEntry.data,
+          headers: new Headers(cachedEntry.headers || {}),
+        },
+      });
     } else {
       dispatch({ type: 'RESET' });
     }
 
     return cachedEntry;
-  }, [cacheKey, enabled, select]);
+  }, [cacheKey, enabled]);
 
   const initializeQuery = useCallback((): void => {
     if (!enabled) return;
@@ -205,8 +219,15 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
     return () => window.removeEventListener('focus', handleWindowFocus);
   }, [enabled, refetchOnWindowFocus, refetch]);
 
+  const selectedData = useMemo(() => {
+    if (state.data === undefined) return undefined;
+    return select ? select(state.data) : (state.data as unknown as TSelectedData);
+  }, [state.data, select]);
+
+
   return {
     ...state,
+    data: selectedData,
     refetch,
   };
 };

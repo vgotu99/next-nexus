@@ -1,11 +1,12 @@
 export interface ServerCacheOptions {
-  revalidate?: CacheRevalidateTime;
+  revalidate?: number;
   tags?: string[];
 }
 
 export interface ClientCacheOptions {
   revalidate?: number;
   tags?: string[];
+  cachedHeaders?: string[];
 }
 
 export interface CacheOptions {
@@ -34,6 +35,7 @@ export interface CacheKeyOptions {
 export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
   source: 'fetch' | 'hydration' | 'manual';
   lastAccessed: number;
+  headers?: Record<string, string>;
 }
 
 export interface ClientCacheState {
@@ -44,14 +46,10 @@ export interface ClientCacheState {
 export type CacheRevalidateTime = number | false;
 
 export interface HydrationData {
-  [cacheKey: string]: {
-    data: unknown;
-    timestamp: number;
-    clientRevalidate?: number;
-    clientTags?: string[];
-    serverTags?: string[];
-    etag?: string;
-  };
+  [cacheKey: string]: Omit<
+    ClientCacheEntry,
+    'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
+  >;
 }
 
 export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'>;

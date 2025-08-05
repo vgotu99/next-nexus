@@ -7,6 +7,7 @@ export interface UseNextQueryOptions<TData = unknown, TSelectedData = TData> {
 
 export interface UseNextQueryResult<TSelectedData = unknown> {
   data: TSelectedData | undefined;
+  headers: Headers | undefined;
   error: Error | null;
   isPending: boolean;
   isSuccess: boolean;
