@@ -13,7 +13,7 @@ import { isMutationDefinition } from '@/utils/definitionUtils';
 
 type MutationAction<TData, TError> =
   | { type: 'SET_PENDING' }
-  | { type: 'SET_SUCCESS'; payload: TData }
+  | { type: 'SET_SUCCESS'; payload: { data: TData; headers: Headers } }
   | { type: 'SET_ERROR'; payload: TError }
   | { type: 'RESET' };
 
@@ -33,7 +33,8 @@ const mutationReducer = <TData, TError>(
     case 'SET_SUCCESS':
       return {
         ...state,
-        data: action.payload,
+        data: action.payload.data,
+        headers: action.payload.headers,
         isPending: false,
         isSuccess: true,
         isError: false,
@@ -43,13 +44,15 @@ const mutationReducer = <TData, TError>(
       return {
         ...state,
         error: action.payload,
+        headers: undefined,
         isPending: false,
         isSuccess: false,
         isError: true,
       };
-    case 'RESET':
+    case 'RESET': 
       return {
         data: undefined,
+        headers: undefined,
         error: null,
         isPending: false,
         isSuccess: false,
@@ -83,6 +86,7 @@ export const useNextMutation = <
 
   const [state, dispatch] = useReducer(mutationReducer<TData, TError>, {
     data: undefined,
+    headers: undefined,
     error: null,
     isPending: false,
     isSuccess: false,
@@ -110,7 +114,7 @@ export const useNextMutation = <
           const response = await nextFetch(definition);
           const data = response.data;
 
-          dispatch({ type: 'SET_SUCCESS', payload: data });
+          dispatch({ type: 'SET_SUCCESS', payload: { data, headers: response.headers } });
 
           if (onSuccess) {
             await onSuccess(data, variables, context);
