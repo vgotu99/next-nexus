@@ -2,13 +2,13 @@ import { performance } from 'perf_hooks';
 
 import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import { clientCacheStore } from '@/cache/clientCacheStore';
+import { requestCache } from '@/cache/requestCache';
 import {
-  getValidCacheMetadataForSkip,
-  getCacheMetadataForETag,
-  extractClientCacheStateFromHeaders,
+  extractClientCacheMetadataFromHeaders,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
 import { createConditionalResponse } from '@/cache/serverETagValidator';
+import { HEADERS } from '@/constants/cache';
 import {
   trackCache,
   trackRequestError,
@@ -39,6 +39,7 @@ import {
   setupHeaders,
   setupTimeout,
 } from '@/utils';
+import { generateCacheKey, generateETag } from '@/utils/cacheUtils';
 
 import {
   createRequestInterceptor,
@@ -91,7 +92,7 @@ const createCachedResponse = <T>(
   const response = new Response(JSON.stringify(null), {
     status: 204,
     statusText: 'Client Cache Hit',
-    headers: { ['x-next-fetch-cache-status']: 'CLIENT_HIT' },
+    headers: { [HEADERS.CACHE_STATUS]: 'CLIENT_HIT' },
   });
 
   const cachedResponse: Omit<InternalNextFetchResponse<T | null>, 'clone'> = {
@@ -124,24 +125,51 @@ const createCachedResponse = <T>(
 const shouldSkipRequest = (
   headers: Headers,
   url: string,
-  method?: string
+  method?: string,
+  clientTags?: string[],
+  serverTags?: string[]
 ): boolean => {
   if (method?.toUpperCase() !== 'GET') {
     return false;
   }
 
-  const allClientCacheState = extractClientCacheStateFromHeaders(headers);
-  if (allClientCacheState.length === 0) {
+  const validClientCache = extractClientCacheMetadataFromHeaders(
+    headers,
+    HEADERS.CLIENT_CACHE
+  );
+
+  if (!validClientCache) {
     return false;
   }
 
-  const validClientCacheState = getValidCacheMetadataForSkip(allClientCacheState);
-  if (validClientCacheState.length === 0) {
-    return false;
+  const cacheKey = generateCacheKey({
+    endpoint: url,
+    method,
+    clientTags,
+    serverTags,
+  });
+  return hasClientCacheEntryByCacheKey(validClientCache, cacheKey);
+};
+
+const getConditionalResponse = (
+  headers: Headers,
+  response: InternalNextFetchResponse<unknown>,
+  method?: string
+): { shouldSkip: boolean; response?: Response } => {
+  if (method?.toUpperCase() !== 'GET') {
+    return { shouldSkip: false };
   }
 
-  const cacheKey = `${method.toUpperCase()}: ${url}`;
-  return hasClientCacheEntryByCacheKey(validClientCacheState, cacheKey);
+  const expiredClientCacheMetadata = extractClientCacheMetadataFromHeaders(
+    headers,
+    HEADERS.REQUEST_ETAG
+  );
+
+  if (!expiredClientCacheMetadata) {
+    return { shouldSkip: false };
+  }
+
+  return createConditionalResponse(response.data, expiredClientCacheMetadata);
 };
 
 const createInterceptorInterface = (
@@ -168,6 +196,20 @@ const createInterceptorInterface = (
   },
 });
 
+const addResponseETagToResponseHeaders = <T>(
+  response: InternalNextFetchResponse<T | undefined>
+): InternalNextFetchResponse<T | undefined> => {
+  if (response.headers.get(HEADERS.RESPONSE_ETAG) || !response.data) {
+    return response;
+  }
+
+  const etag = generateETag(response.data);
+
+  response.headers.set(HEADERS.RESPONSE_ETAG, etag);
+
+  return response;
+};
+
 const executeRequestWithLifecycle = async <T>(
   url: string,
   config: InternalNextFetchRequestConfig,
@@ -184,9 +226,18 @@ const executeRequestWithLifecycle = async <T>(
     requestInterceptors
   );
 
+  const headers = new Headers(modifiedConfig.headers);
+
   if (isServerEnvironment() && modifiedConfig.headers) {
-    const headers = new Headers(modifiedConfig.headers);
-    if (shouldSkipRequest(headers, url, modifiedConfig.method)) {
+    if (
+      shouldSkipRequest(
+        headers,
+        url,
+        modifiedConfig.method,
+        modifiedConfig.client?.tags,
+        modifiedConfig.server?.tags
+      )
+    ) {
       trackCache({
         type: 'SKIP',
         key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
@@ -203,16 +254,11 @@ const executeRequestWithLifecycle = async <T>(
   const request = new Request(url, modifiedConfig);
   const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
 
-  if (isServerEnvironment() && response.data && modifiedConfig.headers) {
-    const headers = new Headers(modifiedConfig.headers);
-    const allClientCacheState = extractClientCacheStateFromHeaders(headers);
-    const clientCacheMetadataForETag = getCacheMetadataForETag(allClientCacheState);
-
-    const conditionalResult = createConditionalResponse(
-      url,
-      response.data,
+  if (isServerEnvironment() && response.data && headers) {
+    const conditionalResult = getConditionalResponse(
       headers,
-      clientCacheMetadataForETag
+      response,
+      modifiedConfig.method
     );
 
     if (conditionalResult.shouldSkip && conditionalResult.response) {
@@ -239,12 +285,38 @@ const executeRequestWithLifecycle = async <T>(
     }
   }
 
+  const responseWithETag = addResponseETagToResponseHeaders(response);
+
+  if (isServerEnvironment() && responseWithETag.data) {
+    const etag = responseWithETag.headers.get(HEADERS.RESPONSE_ETAG);
+
+    if (etag) {
+      const cacheKey = generateCacheKey({
+        endpoint: url,
+        method: config.method,
+        clientTags: config.client?.tags,
+        serverTags: config.server?.tags,
+      });
+
+      const hydrationCacheEntry = {
+        data: responseWithETag.data,
+        key: cacheKey,
+        clientRevalidate: modifiedConfig.client?.revalidate || 0,
+        clientTags: modifiedConfig.client?.tags || [],
+        serverTags: modifiedConfig.server?.tags || [],
+        etag,
+      };
+
+      await requestCache.set(cacheKey, hydrationCacheEntry);
+    }
+  }
+
   const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
-    ...response,
+    ...responseWithETag,
     config: modifiedConfig,
     request,
     clone: () => {
-      const clonedResponse = response.clone();
+      const clonedResponse = responseWithETag.clone();
       const clonedInternalResponse: InternalNextFetchResponse<T | undefined> = {
         ...clonedResponse,
         config: modifiedConfig,
@@ -307,7 +379,12 @@ const executeRequestWithLifecycle = async <T>(
   }
 
   if (isClientEnvironment() && finalResponse.status === 304) {
-    const cacheKey = `${config.method?.toUpperCase() || 'GET'}:${url}`;
+    const cacheKey = generateCacheKey({
+      endpoint: url,
+      method: modifiedConfig.method,
+      clientTags: modifiedConfig.client?.tags,
+      serverTags: modifiedConfig.server?.tags,
+    });
 
     extendCacheEntryTTL(cacheKey, config.client?.revalidate || 0);
 
@@ -352,6 +429,11 @@ export const createNextFetchInstance = (
         ...restConfig,
         method,
         body: definition.data ? JSON.stringify(definition.data) : undefined,
+        headers: {
+          ...restConfig.headers,
+          [HEADERS.CLIENT_TAGS]: JSON.stringify(options.client?.tags || []),
+          [HEADERS.SERVER_TAGS]: JSON.stringify(options.server?.tags || []),
+        },
       },
       defaultHeaders,
       defaultTimeout,
@@ -372,6 +454,7 @@ export const createNextFetchInstance = (
     requestInterceptor,
     responseInterceptor
   );
+  instance.config = defaultConfig;
 
   return instance;
 };
