@@ -7,4 +7,6 @@ export const HEADERS = {
   RESPONSE_ETAG: 'x-next-fetch-response-etag',
   CACHE_REVALIDATION: 'x-next-fetch-cache-revalidation',
   CACHE_STATUS: 'x-next-fetch-cache-status',
+  CLIENT_TAGS: 'x-next-fetch-client-tags',
+  SERVER_TAGS: 'x-next-fetch-server-tags',
 } as const;

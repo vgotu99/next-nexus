@@ -2,11 +2,31 @@
 
 import { useEffect, type ReactNode } from 'react';
 
-import { createCacheStateHeader } from '@/cache/clientCacheStateCollector';
-import { createIfNoneMatchHeader } from '@/cache/expiredCacheETagCollector';
+import {
+  collectExpiredClientCacheMetadata,
+  collectValidClientCacheMetadata,
+  createClientCacheMetadataHeader,
+} from '@/cache/clientCacheMetadataCollector';
+import { clientCacheStore } from '@/cache/clientCacheStore';
+import { HEADERS } from '@/constants/cache';
+import { generateCacheKey } from '@/utils';
 
-const CLIENT_CACHE_HEADER = 'x-next-fetch-client-cache';
-const IF_NONE_MATCH_HEADER = 'if-none-match';
+const safelyParseTags = (tagsHeader: string | null): string[] => {
+  if (!tagsHeader) return [];
+  try {
+    const tags = JSON.parse(tagsHeader);
+    return Array.isArray(tags) ? tags : [];
+  } catch (error) {
+    console.error(
+      '[next-fetch] Failed to parse cache tags. Defaulting to an empty array.',
+      {
+        tagsHeader,
+        error,
+      }
+    );
+    return [];
+  }
+};
 
 const initializeRscRequestInterceptor = (): (() => void) => {
   const originalFetch = window.fetch;
@@ -26,18 +46,56 @@ const initializeRscRequestInterceptor = (): (() => void) => {
       return originalFetch(input, init);
     }
 
-    const cacheStateHeader = createCacheStateHeader();
-    const ifNoneMatchHeader = createIfNoneMatchHeader();
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof Request
+          ? input.url
+          : input.toString();
+    const method = init?.method || 'GET';
+    const clientTags = safelyParseTags(headers.get(HEADERS.CLIENT_TAGS));
+    const serverTags = safelyParseTags(headers.get(HEADERS.SERVER_TAGS));
 
-    if (cacheStateHeader) {
-      headers.set(CLIENT_CACHE_HEADER, cacheStateHeader);
+    const currentRequestCacheKey = generateCacheKey({
+      endpoint: url,
+      method,
+      clientTags,
+      serverTags,
+    });
+
+    const currentRequestClientCacheEntry = clientCacheStore.get<unknown>(
+      currentRequestCacheKey
+    );
+
+    if (!currentRequestClientCacheEntry) {
+      return originalFetch(input, init);
     }
 
-    if (ifNoneMatchHeader) {
-      headers.set(IF_NONE_MATCH_HEADER, ifNoneMatchHeader);
+    const validClientCacheMetadata = collectValidClientCacheMetadata(
+      currentRequestClientCacheEntry
+    );
+
+    const expiredClientCacheMetadata = collectExpiredClientCacheMetadata(
+      currentRequestClientCacheEntry
+    );
+
+    const validClientCacheMetadataHeader = validClientCacheMetadata
+      ? createClientCacheMetadataHeader(validClientCacheMetadata)
+      : null;
+
+    const expiredClientCacheMetadataHeader = expiredClientCacheMetadata
+      ? createClientCacheMetadataHeader(expiredClientCacheMetadata)
+      : null;
+
+    if (validClientCacheMetadataHeader) {
+      headers.set(HEADERS.CLIENT_CACHE, validClientCacheMetadataHeader);
     }
 
-    if (cacheStateHeader || ifNoneMatchHeader) {
+    if (expiredClientCacheMetadataHeader) {
+      headers.set(HEADERS.REQUEST_ETAG, expiredClientCacheMetadataHeader);
+    }
+
+    if (validClientCacheMetadataHeader || expiredClientCacheMetadataHeader) {
       const modifiedInit = { ...init, headers };
       return originalFetch(input, modifiedInit);
     }
@@ -59,11 +117,7 @@ const initializeRscRequestInterceptor = (): (() => void) => {
   };
 };
 
-const NextFetchClientInitializer = ({
-  children,
-}: {
-  children: ReactNode;
-}) => {
+const NextFetchClientInitializer = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const cleanup = initializeRscRequestInterceptor();
 

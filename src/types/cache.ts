@@ -57,7 +57,7 @@ export interface HydrationData {
 export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'>;
 
 export interface SerializedCacheState {
-  metadata: ClientCacheMetadata[];
+  metadata: ClientCacheMetadata;
   timestamp: number;
 }
 
