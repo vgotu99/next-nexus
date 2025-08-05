@@ -404,6 +404,13 @@ const stopAutoCleanup = (): void => {
   }
 };
 
+const setMaxSize = (newSize: number): void => {
+  if (!isClientEnvironment()) return;
+  if (typeof newSize === 'number' && newSize > 0) {
+    clientCacheState.maxSize = newSize;
+  }
+};
+
 export const clientCacheStore = {
   get,
   set,
@@ -419,4 +426,5 @@ export const clientCacheStore = {
   subscribe,
   startAutoCleanup,
   stopAutoCleanup,
+  setMaxSize,
 };

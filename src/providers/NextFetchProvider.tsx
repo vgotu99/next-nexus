@@ -6,12 +6,18 @@ import { isServerEnvironment } from '@/utils';
 
 export interface NextFetchProviderProps {
   children: ReactNode;
+  maxSize?: number;
 }
 
-export const NextFetchProvider = ({ children }: NextFetchProviderProps) => {
+export const NextFetchProvider = ({
+  children,
+  maxSize,
+}: NextFetchProviderProps) => {
   return isServerEnvironment() ? (
     <ServerNextFetchProvider>{children}</ServerNextFetchProvider>
   ) : (
-    <ClientNextFetchProvider>{children}</ClientNextFetchProvider>
+    <ClientNextFetchProvider maxSize={maxSize}>
+      {children}
+    </ClientNextFetchProvider>
   );
 };
