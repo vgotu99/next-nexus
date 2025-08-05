@@ -1,6 +1,4 @@
-import nextFetch from './core';
-
-export default nextFetch;
+export { nextFetch } from './core/client';
 export * from './types';
 export * from './errors/NextFetchError';
 export * from './providers';

@@ -17,10 +17,7 @@ import {
 } from '@/debug/tracker';
 import type {
   InterceptorHandler,
-  NextFetchInstance,
-  NextFetchInterceptorOptions,
   NextFetchInterceptors,
-  NextFetchRequestConfig,
   NextFetchResponse,
   ServerCacheOptions,
 } from '@/types';
@@ -63,25 +60,38 @@ const transformServerOptionsToNextOptions = (
 };
 
 const buildRequestConfig = (
-  config: NextFetchRequestConfig,
-  defaultHeaders: HeadersInit,
-  defaultTimeout?: number,
-  restDefaultConfig: NextFetchRequestConfig = {}
+  definition: NextFetchDefinition<unknown>
 ): InternalNextFetchRequestConfig => {
-  const { server, ...restConfig } = config;
+  const {
+    method,
+    data,
+    timeout,
+    client,
+    server,
+    headers: definitionHeaders,
+    ...restOptions
+  } = definition;
+
   const abortController = new AbortController();
-  const timeout = config.timeout || defaultTimeout;
   const timeoutId = setupTimeout(abortController, timeout);
-  const headers = setupHeaders(defaultHeaders, config.headers);
+
+  const headers = setupHeaders(definitionHeaders, {
+    [HEADERS.CLIENT_TAGS]: JSON.stringify(client?.tags || []),
+    [HEADERS.SERVER_TAGS]: JSON.stringify(server?.tags || []),
+  });
+
   const next = transformServerOptionsToNextOptions(server);
 
   return {
-    ...restDefaultConfig,
-    ...restConfig,
-    next,
+    ...restOptions,
+    method,
     headers,
+    next,
     signal: abortController.signal,
     timeoutId,
+    body: data ? JSON.stringify(data) : undefined,
+    client,
+    server,
   };
 };
 
@@ -213,7 +223,7 @@ const addResponseETagToResponseHeaders = <T>(
 const executeRequestWithLifecycle = async <T>(
   url: string,
   config: InternalNextFetchRequestConfig,
-  interceptors: string[] | undefined,
+  interceptors: string[],
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
 ): Promise<InternalNextFetchResponse<T | null | undefined>> => {
@@ -403,58 +413,27 @@ const executeRequestWithLifecycle = async <T>(
   return finalResponse;
 };
 
-export const createNextFetchInstance = (
-  defaultConfig: NextFetchRequestConfig = {}
-): NextFetchInstance => {
-  const {
-    baseURL = '',
-    headers: defaultHeaders = {},
-    timeout: defaultTimeout,
-    ...restDefaultConfig
-  } = defaultConfig;
+const globalRequestInterceptor = createRequestInterceptor();
+const globalResponseInterceptor = createResponseInterceptor();
 
-  const requestInterceptor = createRequestInterceptor();
-  const responseInterceptor = createResponseInterceptor();
+export const nextFetch = async <T>(
+  definition: NextFetchDefinition<T>
+): Promise<NextFetchResponse<T>> => {
+  const { baseURL, endpoint, interceptors } = definition;
+  const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
 
-  const nextFetch = async <T>(
-    definition: NextFetchDefinition<T>
-  ): Promise<NextFetchResponse<T>> => {
-    const { method, endpoint, options = {} } = definition;
-    const { interceptors, ...restConfig } = options as NextFetchRequestConfig &
-      NextFetchInterceptorOptions;
-    const url = `${baseURL}${endpoint}`;
+  const requestConfig = buildRequestConfig(definition);
 
-    const requestConfig = buildRequestConfig(
-      {
-        ...restConfig,
-        method,
-        body: definition.data ? JSON.stringify(definition.data) : undefined,
-        headers: {
-          ...restConfig.headers,
-          [HEADERS.CLIENT_TAGS]: JSON.stringify(options.client?.tags || []),
-          [HEADERS.SERVER_TAGS]: JSON.stringify(options.server?.tags || []),
-        },
-      },
-      defaultHeaders,
-      defaultTimeout,
-      restDefaultConfig
-    );
-
-    return (await executeRequestWithLifecycle<T>(
-      url,
-      requestConfig,
-      interceptors,
-      requestInterceptor,
-      responseInterceptor
-    )) as NextFetchResponse<T>;
-  };
-
-  const instance = nextFetch as NextFetchInstance;
-  instance.interceptors = createInterceptorInterface(
-    requestInterceptor,
-    responseInterceptor
-  );
-  instance.config = defaultConfig;
-
-  return instance;
+  return (await executeRequestWithLifecycle<T>(
+    url,
+    requestConfig,
+    interceptors || [],
+    globalRequestInterceptor,
+    globalResponseInterceptor
+  )) as NextFetchResponse<T>;
 };
+
+export const interceptors: NextFetchInterceptors = createInterceptorInterface(
+  globalRequestInterceptor,
+  globalResponseInterceptor
+);
