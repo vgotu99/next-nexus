@@ -2,12 +2,12 @@ import type { NextFetchRequestConfig } from './request';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-export interface BaseNextFetchDefinition<TResponse = unknown> {
-  readonly method: HttpMethod;
-  readonly endpoint: string;
-  readonly options?: NextFetchRequestConfig;
-  readonly _phantomResponse?: TResponse;
-}
+export type BaseNextFetchDefinition<TResponse = unknown> =
+  Readonly<NextFetchRequestConfig> & {
+    readonly method: HttpMethod;
+    readonly endpoint: string;
+    readonly _phantomResponse?: TResponse;
+  };
 
 export interface GetNextFetchDefinition<TResponse = unknown>
   extends BaseNextFetchDefinition<TResponse> {
@@ -46,11 +46,11 @@ export type NextFetchDefinition<TResponse = unknown> =
   | PatchNextFetchDefinition<TResponse>
   | DeleteNextFetchDefinition<TResponse>;
 
-export interface CreateNextFetchDefinitionConfig {
+export interface CreateNextFetchDefinitionConfig
+  extends NextFetchRequestConfig {
   method: HttpMethod;
   endpoint: string;
   data?: unknown;
-  options?: NextFetchRequestConfig;
 }
 
 export type MutationDefinition<TResponse = unknown, TVariables = unknown> = (
@@ -61,3 +61,7 @@ export type MutationDefinition<TResponse = unknown, TVariables = unknown> = (
 ) & {
   readonly _phantomVariables?: TVariables;
 };
+
+export type DefinitionCreator = <TResponse = unknown>(
+  config: CreateNextFetchDefinitionConfig
+) => NextFetchDefinition<TResponse>;

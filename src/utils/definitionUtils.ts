@@ -6,34 +6,43 @@ import type {
   PutNextFetchDefinition,
   PatchNextFetchDefinition,
   DeleteNextFetchDefinition,
+  DefinitionCreator,
 } from '@/types/definition';
 
-const validateConfig = (config: CreateNextFetchDefinitionConfig): void => {
-  if (!config.method) {
+const validateConfig = (definition: NextFetchDefinition): void => {
+  const { method, endpoint } = definition;
+  if (!method) {
     throw new Error('Method is required');
   }
-  if (!config.endpoint) {
+  if (!endpoint) {
     throw new Error('Endpoint is required');
   }
-  if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method)) {
-    throw new Error(`Unsupported HTTP method: ${config.method}`);
+  if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    throw new Error(`Unsupported HTTP method: ${method}`);
   }
 };
 
-export const createNextFetchDefinition = <TResponse = unknown>(
-  config: CreateNextFetchDefinitionConfig
-): NextFetchDefinition<TResponse> => {
-  validateConfig(config);
-  const { method, endpoint, data, options } = config;
+export const createNextFetchDefinition = (
+  defaultConfig: CreateNextFetchDefinitionConfig
+): DefinitionCreator => {
+  return <TResponse = unknown>(config: CreateNextFetchDefinitionConfig) => {
+    const { headers: defaultConfigHeaders, ...restDefaultConfig } =
+      defaultConfig;
+    const { headers: configHeaders, ...restConfig } = config;
 
-  const definition = {
-    method,
-    endpoint,
-    options,
-    data: ['POST', 'PUT', 'PATCH'].includes(method) ? data : undefined,
+    const definition: NextFetchDefinition<TResponse> = {
+      ...restDefaultConfig,
+      ...restConfig,
+      headers: {
+        ...defaultConfigHeaders,
+        ...configHeaders,
+      },
+    } as NextFetchDefinition<TResponse>;
+
+    validateConfig(definition);
+
+    return definition;
   };
-
-  return definition as NextFetchDefinition<TResponse>;
 };
 
 export const isGetDefinition = <TResponse>(
