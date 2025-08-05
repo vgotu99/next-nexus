@@ -226,6 +226,8 @@ const set = <T = unknown>(
 ): void => {
   if (!isClientEnvironment()) return;
 
+  const isUpdated = clientCacheState.clientCache.has(key);
+
   const entry = createClientCacheEntry(
     data,
     key,
@@ -239,7 +241,7 @@ const set = <T = unknown>(
   setClientCache(key, entry);
 
   trackCache({
-    type: 'SET',
+    type: isUpdated ? 'UPDATE' : 'SET',
     key,
     source: `client-${source}`,
     tags: clientTags,
