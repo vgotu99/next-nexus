@@ -1,11 +1,12 @@
-export interface UseNextQueryOptions<TData = unknown, TSelectedData = TData> {
+export interface UseNextFetchOptions<TData = unknown, TSelectedData = TData> {
+  route?: string;
   enabled?: boolean;
   select?: (data: TData) => TSelectedData;
   refetchOnWindowFocus?: boolean;
   refetchOnMount?: boolean;
 }
 
-export interface UseNextQueryResult<TSelectedData = unknown> {
+export interface UseNextFetchResult<TSelectedData = unknown> {
   data: TSelectedData | undefined;
   headers: Headers | undefined;
   error: Error | null;
@@ -15,8 +16,8 @@ export interface UseNextQueryResult<TSelectedData = unknown> {
   refetch: () => Promise<void>;
 }
 
-export type NextQueryState<TSelectedData = unknown> = Omit<
-  UseNextQueryResult<TSelectedData>,
+export type NextFetchState<TSelectedData = unknown> = Omit<
+  UseNextFetchResult<TSelectedData>,
   'refetch'
 >;
 
@@ -51,6 +52,7 @@ export interface UseNextMutationResult<
   TVariables = unknown,
 > {
   data: TData | undefined;
+  headers: Headers | undefined;
   error: TError | null;
   isPending: boolean;
   isSuccess: boolean;
