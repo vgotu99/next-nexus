@@ -49,7 +49,7 @@ const mutationReducer = <TData, TError>(
         isSuccess: false,
         isError: true,
       };
-    case 'RESET': 
+    case 'RESET':
       return {
         data: undefined,
         headers: undefined,
@@ -82,7 +82,7 @@ export const useNextMutation = <
     );
   }
 
-  const { onMutate, onSuccess, onError, onSettled } = options;
+  const { route, onMutate, onSuccess, onError, onSettled } = options;
 
   const [state, dispatch] = useReducer(mutationReducer<TData, TError>, {
     data: undefined,
@@ -111,10 +111,17 @@ export const useNextMutation = <
       }> => {
         try {
           const definition = mutationDefinitionFactory(variables);
-          const response = await nextFetch(definition);
-          const data = response.data;
+          const finalDefinition = route
+            ? { ...definition, baseURL: '', endpoint: route }
+            : definition;
 
-          dispatch({ type: 'SET_SUCCESS', payload: { data, headers: response.headers } });
+          const response = await nextFetch(finalDefinition);
+          const { data, headers } = response;
+
+          dispatch({
+            type: 'SET_SUCCESS',
+            payload: { data, headers },
+          });
 
           if (onSuccess) {
             await onSuccess(data, variables, context);
@@ -146,6 +153,7 @@ export const useNextMutation = <
     },
     [
       state.isPending,
+      route,
       onMutate,
       onSuccess,
       onError,

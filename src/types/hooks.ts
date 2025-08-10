@@ -27,6 +27,7 @@ export interface UseNextMutationOptions<
   TData = unknown,
   TVariables = unknown,
 > {
+  route?: string;
   onMutate?: (variables: TVariables) => TContext | Promise<TContext>;
   onSuccess?: (
     data: TData,
