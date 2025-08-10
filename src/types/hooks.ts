@@ -1,4 +1,4 @@
-export interface UseNextFetchOptions<TData = unknown, TSelectedData = TData> {
+export interface UseNextQueryOptions<TData = unknown, TSelectedData = TData> {
   route?: string;
   enabled?: boolean;
   select?: (data: TData) => TSelectedData;
@@ -6,7 +6,7 @@ export interface UseNextFetchOptions<TData = unknown, TSelectedData = TData> {
   refetchOnMount?: boolean;
 }
 
-export interface UseNextFetchResult<TSelectedData = unknown> {
+export interface UseNextQueryResult<TSelectedData = unknown> {
   data: TSelectedData | undefined;
   headers: Headers | undefined;
   error: Error | null;
@@ -16,8 +16,8 @@ export interface UseNextFetchResult<TSelectedData = unknown> {
   refetch: () => Promise<void>;
 }
 
-export type NextFetchState<TSelectedData = unknown> = Omit<
-  UseNextFetchResult<TSelectedData>,
+export type NextQueryState<TSelectedData = unknown> = Omit<
+  UseNextQueryResult<TSelectedData>,
   'refetch'
 >;
 

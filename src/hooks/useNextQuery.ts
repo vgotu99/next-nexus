@@ -11,9 +11,9 @@ import type {
   NextFetchDefinition,
 } from '@/types/definition';
 import type {
-  NextFetchState,
-  UseNextFetchOptions,
-  UseNextFetchResult,
+  NextQueryState,
+  UseNextQueryOptions,
+  UseNextQueryResult,
 } from '@/types/hooks';
 import {
   generateCacheKeyFromDefinition,
@@ -21,16 +21,16 @@ import {
 } from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
 
-type FetchAction<TData> =
+type QueryAction<TData> =
   | { type: 'SET_RESULT'; payload: { data: TData; headers: Headers } }
   | { type: 'SET_ERROR'; payload: Error }
   | { type: 'SET_PENDING'; payload: boolean }
   | { type: 'RESET' };
 
-const fetchReducer = <TData>(
-  state: NextFetchState<TData>,
-  action: FetchAction<TData>
-): NextFetchState<TData> => {
+const queryReducer = <TData>(
+  state: NextQueryState<TData>,
+  action: QueryAction<TData>
+): NextQueryState<TData> => {
   switch (action.type) {
     case 'SET_RESULT':
       return {
@@ -109,19 +109,19 @@ const fetchData = async <TData>(
   return { data: response.data, headers: response.headers };
 };
 
-export const useNextFetch = <TData = unknown, TSelectedData = TData>(
+export const useNextQuery = <TData = unknown, TSelectedData = TData>(
   definition: NextFetchDefinition<TData>,
-  options: UseNextFetchOptions<TData, TSelectedData> = {}
-): UseNextFetchResult<TSelectedData> => {
+  options: UseNextQueryOptions<TData, TSelectedData> = {}
+): UseNextQueryResult<TSelectedData> => {
   if (!definition) {
-    throw new Error('useNextFetch: definition is required');
+    throw new Error('useNextQuery: definition is required');
   }
   if (!isGetDefinition(definition)) {
-    throw new Error('useNextFetch only accepts GET definitions');
+    throw new Error('useNextQuery only accepts GET definitions');
   }
   if (typeof definition.endpoint !== 'string' || !definition.endpoint) {
     throw new Error(
-      'useNextFetch: definition.endpoint must be a non-empty string'
+      'useNextQuery: definition.endpoint must be a non-empty string'
     );
   }
 
@@ -133,7 +133,7 @@ export const useNextFetch = <TData = unknown, TSelectedData = TData>(
     refetchOnMount = true,
   } = options;
 
-  const [state, dispatch] = useReducer(fetchReducer<TData>, {
+  const [state, dispatch] = useReducer(queryReducer<TData>, {
     data: undefined,
     headers: undefined,
     error: null,
@@ -161,7 +161,7 @@ export const useNextFetch = <TData = unknown, TSelectedData = TData>(
 
       dispatch({
         type: 'SET_ERROR',
-        payload: new Error(`useNextFetch failed: ${errorMessage}`),
+        payload: new Error(`useNextQuery failed: ${errorMessage}`),
       });
     }
   }, [definition, cacheKey, enabled, route]);
@@ -186,7 +186,7 @@ export const useNextFetch = <TData = unknown, TSelectedData = TData>(
     return cachedEntry;
   }, [cacheKey, enabled]);
 
-  const initializeFetch = useCallback((): void => {
+  const initializeQuery = useCallback((): void => {
     if (!enabled) return;
 
     const cachedEntry = syncStateWithCache();
@@ -202,8 +202,8 @@ export const useNextFetch = <TData = unknown, TSelectedData = TData>(
       return;
     }
 
-    refetchOnMount ? refetch() : initializeFetch();
-  }, [enabled, refetchOnMount, initializeFetch, refetch]);
+    refetchOnMount ? refetch() : initializeQuery();
+  }, [enabled, refetchOnMount, initializeQuery, refetch]);
 
   useEffect(() => {
     if (!enabled) return;
