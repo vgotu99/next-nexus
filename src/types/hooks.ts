@@ -67,3 +67,38 @@ export type NextMutationState<TData = unknown, TError = Error> = Omit<
   UseNextMutationResult<TData, TError, unknown>,
   'mutate' | 'mutateAsync' | 'reset'
 >;
+
+export interface UseNextActionOptions<
+  TResult = unknown,
+  TArgs extends unknown[] = [FormData],
+> {
+  onStart?: (...args: TArgs) => void | Promise<void>;
+  onSuccess?: (result: TResult, ...args: TArgs) => void | Promise<void>;
+  onError?: (error: Error, ...args: TArgs) => void | Promise<void>;
+  onSettled?: (
+    result: TResult | undefined,
+    error: Error | null,
+    ...args: TArgs
+  ) => void | Promise<void>;
+}
+
+export interface UseNextActionResult<
+  TResult = unknown,
+  TError = Error,
+  TArgs extends unknown[] = [FormData],
+> {
+  action: (...args: TArgs) => void;
+  actionAsync: (...args: TArgs) => Promise<TResult>;
+  formAction: (...args: TArgs) => Promise<TResult>;
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  result: TResult | undefined;
+  error: TError | null;
+  reset: () => void;
+}
+
+export type NextActionState<TResult = unknown, TError = Error> = Omit<
+  UseNextActionResult<TResult, TError, unknown[]>,
+  'action' | 'actionAsync' | 'formAction' | 'createFormSubmitHandler' | 'reset'
+>;
