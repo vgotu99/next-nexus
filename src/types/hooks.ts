@@ -101,3 +101,28 @@ export type NextActionState<TResult = unknown, TError = Error> = Omit<
   UseNextActionResult<TResult, TError, unknown[]>,
   'execute' | 'executeAsync' | 'reset'
 >;
+
+export interface UseNextFormActionOptions<TResult = unknown> {
+  onStart?: () => void | Promise<void>;
+  onSuccess?: (result: TResult) => void | Promise<void>;
+  onError?: (error: Error) => void | Promise<void>;
+  onSettled?: (
+    result: TResult | undefined,
+    error: Error | null
+  ) => void | Promise<void>;
+}
+
+export interface UseNextFormActionResult<TResult = unknown, TError = Error> {
+  formAction: (formData: FormData) => void;
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  result: TResult | undefined;
+  error: TError | null;
+  reset: () => void;
+}
+
+export type NextFormActionState<TResult = unknown, TError = Error> = Omit<
+  UseNextFormActionResult<TResult, TError>,
+  'formAction' | 'reset'
+>;
