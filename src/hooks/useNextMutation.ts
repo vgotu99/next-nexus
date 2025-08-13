@@ -82,7 +82,7 @@ export const useNextMutation = <
     );
   }
 
-  const { route, onMutate, onSuccess, onError, onSettled } = options;
+  const { route, onStart, onSuccess, onError, onSettled } = options;
 
   const [state, dispatch] = useReducer(mutationReducer<TData, TError>, {
     data: undefined,
@@ -99,8 +99,8 @@ export const useNextMutation = <
         throw new Error('Mutation is already in progress');
       }
 
-      const context: TContext | undefined = onMutate
-        ? await onMutate(variables)
+      const context: TContext | undefined = onStart
+        ? await onStart(variables)
         : undefined;
 
       dispatch({ type: 'SET_PENDING' });
@@ -154,7 +154,7 @@ export const useNextMutation = <
     [
       state.isPending,
       route,
-      onMutate,
+      onStart,
       onSuccess,
       onError,
       onSettled,
@@ -164,7 +164,7 @@ export const useNextMutation = <
 
   const mutate = useCallback(
     (variables: TVariables): void => {
-      executeMutation(variables).catch(() => {});
+      void executeMutation(variables).catch(() => {});
     },
     [executeMutation]
   );
