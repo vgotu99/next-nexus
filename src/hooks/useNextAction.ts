@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useActionState,
-  useCallback,
-  useEffect,
-  useReducer,
-  useRef,
-  useTransition,
-} from 'react';
+import { useCallback, useReducer, useTransition } from 'react';
 
 import type {
   NextActionState,
@@ -88,81 +81,6 @@ export const useNextAction = <
 
   const [isTransitionPending, startTransition] = useTransition();
 
-  const actionForForm = serverAction as unknown as (
-    formData: FormData
-  ) => Promise<TResult>;
-  const [nativeState, nativeFormAction, nativePending] = useActionState(
-    ((_: unknown, formData: FormData) => actionForForm(formData)) as (
-      prev: unknown,
-      formData: FormData
-    ) => Promise<unknown> | unknown,
-    undefined as unknown as TResult
-  );
-
-  const prevPendingRef = useRef(false);
-  const prevResultRef = useRef<unknown>(undefined);
-
-  useEffect(() => {
-    const prevPending = prevPendingRef.current;
-    if (nativePending && !prevPending) {
-      dispatch({ type: 'SET_PENDING' });
-      if (onStart)
-        void (onStart as (...args: TArgs) => void)(...([] as unknown as TArgs));
-    }
-
-    if (!nativePending && prevPending) {
-      const next = nativeState as TResult | undefined;
-      const maybe = next as unknown as { isError?: boolean; error?: unknown };
-      const looksError = maybe?.isError === true;
-      if (looksError) {
-        const err =
-          maybe?.error instanceof Error
-            ? (maybe.error as TError)
-            : (new Error('Action returned error state') as TError);
-        dispatch({ type: 'SET_ERROR', payload: err });
-        if (onError)
-          void (onError as (e: Error, ...args: TArgs) => void)(
-            err as Error,
-            ...([] as unknown as TArgs)
-          );
-        if (onSettled)
-          void (
-            onSettled as (
-              r: TResult | undefined,
-              e: Error | null,
-              ...args: TArgs
-            ) => void
-          )(undefined, err as Error, ...([] as unknown as TArgs));
-      } else {
-        dispatch({ type: 'SET_SUCCESS', payload: next as TResult });
-        if (onSuccess)
-          void (onSuccess as (r: TResult, ...args: TArgs) => void)(
-            next as TResult,
-            ...([] as unknown as TArgs)
-          );
-        if (onSettled)
-          void (
-            onSettled as (
-              r: TResult | undefined,
-              e: Error | null,
-              ...args: TArgs
-            ) => void
-          )(next as TResult, null, ...([] as unknown as TArgs));
-      }
-    }
-
-    prevPendingRef.current = nativePending;
-    prevResultRef.current = nativeState;
-  }, [
-    nativePending,
-    nativeState,
-    nativeFormAction,
-    onStart,
-    onSuccess,
-    onError,
-    onSettled,
-  ]);
-
   const executeAction = useCallback(
     async (...args: TArgs): Promise<TResult> => {
       if (state.isPending || isTransitionPending) {
@@ -183,8 +101,8 @@ export const useNextAction = <
             await onSuccess(value, ...args);
           }
           return {
-            result: value as TResult | undefined,
-            error: null as TError | null,
+            result: value,
+            error: null,
           };
         } catch (error) {
           const typedError = (
@@ -195,7 +113,7 @@ export const useNextAction = <
             await onError(typedError, ...args);
           }
           return {
-            result: undefined as TResult | undefined,
+            result: undefined,
             error: typedError,
           };
         }
@@ -221,7 +139,7 @@ export const useNextAction = <
     ]
   );
 
-  const action = useCallback(
+  const execute = useCallback(
     (...args: TArgs): void => {
       startTransition(() => {
         void executeAction(...args).catch(() => {});
@@ -230,28 +148,19 @@ export const useNextAction = <
     [executeAction, startTransition]
   );
 
-  const actionAsync = useCallback(
+  const executeAsync = useCallback(
     (...args: TArgs): Promise<TResult> => executeAction(...args),
     [executeAction]
   );
-
-  const formAction = nativeFormAction as unknown as (
-    ...args: TArgs
-  ) => Promise<TResult>;
 
   const reset = useCallback((): void => {
     dispatch({ type: 'RESET' });
   }, []);
 
   return {
-    action,
-    actionAsync,
-    formAction,
-    isPending: state.isPending || isTransitionPending,
-    isSuccess: state.isSuccess,
-    isError: state.isError,
-    result: state.result,
-    error: state.error,
+    ...state,
+    execute,
+    executeAsync,
     reset,
   };
 };

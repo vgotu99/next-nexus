@@ -85,11 +85,10 @@ export interface UseNextActionOptions<
 export interface UseNextActionResult<
   TResult = unknown,
   TError = Error,
-  TArgs extends unknown[] = [FormData],
+  TArgs extends unknown[] = unknown[],
 > {
-  action: (...args: TArgs) => void;
-  actionAsync: (...args: TArgs) => Promise<TResult>;
-  formAction: (...args: TArgs) => Promise<TResult>;
+  execute: (...args: TArgs) => void;
+  executeAsync: (...args: TArgs) => Promise<TResult>;
   isPending: boolean;
   isSuccess: boolean;
   isError: boolean;
@@ -100,5 +99,5 @@ export interface UseNextActionResult<
 
 export type NextActionState<TResult = unknown, TError = Error> = Omit<
   UseNextActionResult<TResult, TError, unknown[]>,
-  'action' | 'actionAsync' | 'formAction' | 'createFormSubmitHandler' | 'reset'
+  'execute' | 'executeAsync' | 'reset'
 >;
