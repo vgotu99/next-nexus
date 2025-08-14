@@ -9,12 +9,6 @@ import {
 } from './httpErrorFactory';
 import { processResponse } from './processResponse';
 
-type TimeoutCleanup = () => void;
-
-const cleanupTimeout = (timeoutId?: NodeJS.Timeout): void => {
-  if (timeoutId) clearTimeout(timeoutId);
-};
-
 const performFetch = async (request: Request): Promise<Response> => {
   return await fetch(request);
 };
@@ -28,17 +22,14 @@ const handleErrorResponse = async (
 };
 
 export const executeRequest = async <T>(
-  request: Request,
-  timeoutId?: NodeJS.Timeout
+  request: Request
 ): Promise<InternalNextFetchResponse<T | undefined>> => {
   const startTime = performance.now();
-  const cleanup: TimeoutCleanup = () => cleanupTimeout(timeoutId);
 
   try {
     validateUrl(request.url);
 
     const response = await performFetch(request);
-    cleanup();
 
     if (!response.ok) {
       await handleErrorResponse(response, request);
@@ -46,8 +37,6 @@ export const executeRequest = async <T>(
 
     return processResponse<T>(response, request.method);
   } catch (error) {
-    cleanup();
-
     const duration = performance.now() - startTime;
 
     if (error instanceof Error && error.name === 'AbortError') {

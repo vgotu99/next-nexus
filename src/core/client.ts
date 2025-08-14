@@ -34,9 +34,9 @@ import {
   isClientEnvironment,
   isServerEnvironment,
   setupHeaders,
-  setupTimeout,
 } from '@/utils';
 import { generateCacheKey, generateETag } from '@/utils/cacheUtils';
+import { retry } from '@/utils/retry';
 
 import {
   createRequestInterceptor,
@@ -65,15 +65,11 @@ const buildRequestConfig = (
   const {
     method,
     data,
-    timeout,
     client,
     server,
     headers: definitionHeaders,
     ...restOptions
   } = definition;
-
-  const abortController = new AbortController();
-  const timeoutId = setupTimeout(abortController, timeout);
 
   const headers = setupHeaders(definitionHeaders, {
     [HEADERS.CLIENT_TAGS]: JSON.stringify(client?.tags || []),
@@ -87,8 +83,6 @@ const buildRequestConfig = (
     method,
     headers,
     next,
-    signal: abortController.signal,
-    timeoutId,
     body: data ? JSON.stringify(data) : undefined,
     client,
     server,
@@ -261,167 +255,190 @@ const executeRequestWithLifecycle = async <T>(
     }
   }
 
-  const request = new Request(url, modifiedConfig);
-  const response = await executeRequest<T>(request, modifiedConfig.timeoutId);
+  try {
+    const response = await retry({
+      attempt: ({ signal }) => {
+        const attemptConfig = { ...modifiedConfig, signal };
+        const request = new Request(url, attemptConfig);
+        return executeRequest<T>(request);
+      },
+      maxAttempts: (modifiedConfig.retry?.count ?? 0) + 1,
+      delaySeconds: modifiedConfig.retry?.delay ?? 1,
+      timeoutSeconds: modifiedConfig.timeout ?? 10,
+    });
 
-  if (isServerEnvironment() && response.data && headers) {
-    const conditionalResult = getConditionalResponse(
-      headers,
-      response,
-      modifiedConfig.method
+    if (isServerEnvironment() && response.data && headers) {
+      const conditionalResult = getConditionalResponse(
+        headers,
+        response,
+        modifiedConfig.method
+      );
+
+      if (conditionalResult.shouldSkip && conditionalResult.response) {
+        trackCache({
+          type: 'MATCH',
+          key: `${config.method?.toUpperCase() || 'GET'}: ${url}`,
+          source: 'server',
+          tags: modifiedConfig.client?.tags,
+          revalidate: modifiedConfig.client?.revalidate,
+          ttl: modifiedConfig.client?.revalidate || 0,
+        });
+
+        const notModifiedResponse: InternalNextFetchResponse<
+          T | null | undefined
+        > = {
+          ...conditionalResult.response,
+          data: null,
+          config: modifiedConfig,
+          request: new Request(url, modifiedConfig),
+          clone: () => notModifiedResponse,
+        };
+
+        return notModifiedResponse;
+      }
+    }
+
+    const responseWithETag = addResponseETagToResponseHeaders(response);
+
+    if (isServerEnvironment() && responseWithETag.data) {
+      const etag = responseWithETag.headers.get(HEADERS.RESPONSE_ETAG);
+
+      const cachedResponseHeaders =
+        modifiedConfig.client?.cachedHeaders?.reduce<Record<string, string>>(
+          (acc, headerName) => {
+            const headerValue = responseWithETag.headers.get(headerName);
+            if (headerValue !== null) {
+              acc[headerName] = headerValue;
+            }
+            return acc;
+          },
+          {}
+        );
+
+      if (etag) {
+        const cacheKey = generateCacheKey({
+          endpoint: url,
+          method: config.method,
+          clientTags: config.client?.tags,
+          serverTags: config.server?.tags,
+        });
+
+        const hydrationCacheEntry = {
+          data: responseWithETag.data,
+          key: cacheKey,
+          clientRevalidate: modifiedConfig.client?.revalidate || 0,
+          clientTags: modifiedConfig.client?.tags || [],
+          serverTags: modifiedConfig.server?.tags || [],
+          etag,
+          headers: cachedResponseHeaders,
+        };
+
+        await requestCache.set(cacheKey, hydrationCacheEntry);
+      }
+    }
+
+    const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
+      ...responseWithETag,
+      config: modifiedConfig,
+      request: new Request(url, modifiedConfig),
+      clone: () => {
+        const clonedResponse = responseWithETag.clone();
+        const clonedInternalResponse: InternalNextFetchResponse<T | undefined> =
+          {
+            ...clonedResponse,
+            config: modifiedConfig,
+            request: new Request(url, modifiedConfig),
+            data: clonedResponse.data,
+          };
+        return clonedInternalResponse;
+      },
+    };
+
+    const responseInterceptors = responseInterceptor.getByNames(interceptors);
+    const finalResponse = await applyResponseInterceptors<T>(
+      responseWithConfig,
+      responseInterceptors
     );
 
-    if (conditionalResult.shouldSkip && conditionalResult.response) {
-      trackCache({
-        type: 'MATCH',
-        key: `${config.method?.toUpperCase() || 'GET'}: ${url}`,
-        source: 'server',
-        tags: modifiedConfig.client?.tags,
-        revalidate: modifiedConfig.client?.revalidate,
-        ttl: modifiedConfig.client?.revalidate || 0,
-      });
+    const duration = performance.now() - startTime;
 
-      const notModifiedResponse: InternalNextFetchResponse<
-        T | null | undefined
-      > = {
-        ...conditionalResult.response,
-        data: null,
-        config: modifiedConfig,
-        request,
-        clone: () => notModifiedResponse,
-      };
+    if (isServerEnvironment()) {
+      const cacheStatus = response.headers.get('x-nextjs-cache');
+      const ageHeader = response.headers.get('age');
+      const age = ageHeader ? parseInt(ageHeader, 10) : undefined;
+      const revalidate = modifiedConfig.next?.revalidate as number | undefined;
 
-      return notModifiedResponse;
-    }
-  }
-
-  const responseWithETag = addResponseETagToResponseHeaders(response);
-
-  if (isServerEnvironment() && responseWithETag.data) {
-    const etag = responseWithETag.headers.get(HEADERS.RESPONSE_ETAG);
-
-    const cachedResponseHeaders = modifiedConfig.client?.cachedHeaders?.reduce<
-      Record<string, string>
-    >((acc, headerName) => {
-      const headerValue = responseWithETag.headers.get(headerName);
-      if (headerValue !== null) {
-        acc[headerName] = headerValue;
+      if (cacheStatus) {
+        trackCache({
+          type: cacheStatus as 'HIT' | 'MISS',
+          key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+          source: 'server',
+          duration: duration,
+          status: finalResponse.status,
+          tags: modifiedConfig.next?.tags,
+          revalidate: modifiedConfig.next?.revalidate,
+          ttl:
+            revalidate !== undefined && age !== undefined
+              ? revalidate - age
+              : undefined,
+        });
       }
-      return acc;
-    }, {});
+    }
 
-    if (etag) {
+    if (finalResponse.ok) {
+      const responseSize = finalResponse.data
+        ? JSON.stringify(finalResponse.data).length
+        : 0;
+      trackRequestSuccess({
+        url,
+        method: config.method || 'GET',
+        duration,
+        status: finalResponse.status,
+        responseSize,
+      });
+    } else {
+      trackRequestError({
+        url,
+        method: config.method || 'GET',
+        duration,
+        error: `HTTP ${finalResponse.status}`,
+      });
+    }
+
+    if (isClientEnvironment() && finalResponse.status === 304) {
       const cacheKey = generateCacheKey({
         endpoint: url,
-        method: config.method,
-        clientTags: config.client?.tags,
-        serverTags: config.server?.tags,
+        method: modifiedConfig.method,
+        clientTags: modifiedConfig.client?.tags,
+        serverTags: modifiedConfig.server?.tags,
       });
 
-      const hydrationCacheEntry = {
-        data: responseWithETag.data,
-        key: cacheKey,
-        clientRevalidate: modifiedConfig.client?.revalidate || 0,
-        clientTags: modifiedConfig.client?.tags || [],
-        serverTags: modifiedConfig.server?.tags || [],
-        etag,
-        headers: cachedResponseHeaders,
-      };
+      extendCacheEntryTTL(cacheKey, config.client?.revalidate || 0);
 
-      await requestCache.set(cacheKey, hydrationCacheEntry);
-    }
-  }
-
-  const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
-    ...responseWithETag,
-    config: modifiedConfig,
-    request,
-    clone: () => {
-      const clonedResponse = responseWithETag.clone();
-      const clonedInternalResponse: InternalNextFetchResponse<T | undefined> = {
-        ...clonedResponse,
-        config: modifiedConfig,
-        request,
-        data: clonedResponse.data,
-      };
-      return clonedInternalResponse;
-    },
-  };
-
-  const responseInterceptors = responseInterceptor.getByNames(interceptors);
-  const finalResponse = await applyResponseInterceptors<T>(
-    responseWithConfig,
-    responseInterceptors
-  );
-
-  const duration = performance.now() - startTime;
-
-  if (isServerEnvironment()) {
-    const cacheStatus = response.headers.get('x-nextjs-cache');
-    const ageHeader = response.headers.get('age');
-    const age = ageHeader ? parseInt(ageHeader, 10) : undefined;
-    const revalidate = modifiedConfig.next?.revalidate as number | undefined;
-
-    if (cacheStatus) {
       trackCache({
-        type: cacheStatus as 'HIT' | 'MISS',
-        key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
-        source: 'server',
-        duration: duration,
-        status: finalResponse.status,
-        tags: modifiedConfig.next?.tags,
-        revalidate: modifiedConfig.next?.revalidate,
-        ttl:
-          revalidate !== undefined && age !== undefined
-            ? revalidate - age
-            : undefined,
+        type: 'UPDATE',
+        key: cacheKey,
+        source: 'client-fetch',
+        tags: config.client?.tags,
+        revalidate: config.client?.revalidate,
+        ttl: config.client?.revalidate || 0,
+        size: clientCacheStore.size(),
+        maxSize: clientCacheStore.getStats().maxSize,
       });
     }
-  }
 
-  if (finalResponse.ok) {
-    const responseSize = finalResponse.data
-      ? JSON.stringify(finalResponse.data).length
-      : 0;
-    trackRequestSuccess({
-      url,
-      method: config.method || 'GET',
-      duration,
-      status: finalResponse.status,
-      responseSize,
-    });
-  } else {
+    return finalResponse;
+  } catch (error) {
+    const duration = performance.now() - startTime;
     trackRequestError({
       url,
       method: config.method || 'GET',
       duration,
-      error: `HTTP ${finalResponse.status}`,
+      error:
+        error instanceof Error ? error.message : 'Unknown error after retries',
     });
+    throw error;
   }
-
-  if (isClientEnvironment() && finalResponse.status === 304) {
-    const cacheKey = generateCacheKey({
-      endpoint: url,
-      method: modifiedConfig.method,
-      clientTags: modifiedConfig.client?.tags,
-      serverTags: modifiedConfig.server?.tags,
-    });
-
-    extendCacheEntryTTL(cacheKey, config.client?.revalidate || 0);
-
-    trackCache({
-      type: 'UPDATE',
-      key: cacheKey,
-      source: 'client-fetch',
-      tags: config.client?.tags,
-      revalidate: config.client?.revalidate,
-      ttl: config.client?.revalidate || 0,
-      size: clientCacheStore.size(),
-      maxSize: clientCacheStore.getStats().maxSize,
-    });
-  }
-
-  return finalResponse;
 };
 
 const globalRequestInterceptor = createRequestInterceptor();
