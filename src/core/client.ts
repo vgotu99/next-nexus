@@ -425,7 +425,7 @@ const executeRequestWithLifecycle = async <T>(
         revalidate: config.client?.revalidate,
         ttl: config.client?.revalidate || 0,
         size: clientCacheStore.size(),
-        maxSize: clientCacheStore.getStats().maxSize,
+        maxSize: clientCacheStore.getMaxSize(),
       });
     }
 

@@ -33,22 +33,19 @@ export interface CacheKeyOptions {
 
 export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
   source?: 'fetch' | 'hydration' | 'manual';
-  lastAccessed: number;
   headers?: Record<string, string>;
 }
 
 export interface ClientCacheState {
   clientCache: Map<string, ClientCacheEntry>;
+  tagIndex: Map<string, Set<string>>;
   maxSize: number;
 }
 
 export type CacheRevalidateTime = number | false;
 
 export interface HydrationData {
-  [cacheKey: string]: Omit<
-    ClientCacheEntry,
-    'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
-  >;
+  [cacheKey: string]: Omit<ClientCacheEntry, 'key' | 'createdAt' | 'expiresAt'>;
 }
 
 export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'>;

@@ -2,12 +2,7 @@ import { DEFAULT_CLIENT_CACHE_MAX_SIZE } from '@/constants/cache';
 import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import { trackCache } from '@/debug/tracker';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
-import {
-  createCacheEntry,
-  isCacheEntryExpired,
-  normalizeCacheTags,
-  hasCommonTags,
-} from '@/utils/cacheUtils';
+import { createCacheEntry, normalizeCacheTags } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
 
@@ -19,6 +14,7 @@ declare global {
 
 const clientCacheState: ClientCacheState = {
   clientCache: new Map(),
+  tagIndex: new Map(),
   maxSize: DEFAULT_CLIENT_CACHE_MAX_SIZE,
 };
 
@@ -66,10 +62,7 @@ const subscribe = <T = unknown>(
 };
 
 const createClientCacheEntry = <T>(
-  entry: Omit<
-    ClientCacheEntry<T>,
-    'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
-  >
+  entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'expiresAt'>
 ): ClientCacheEntry<T> => {
   const baseEntry = createCacheEntry(
     entry.data,
@@ -83,24 +76,19 @@ const createClientCacheEntry = <T>(
     ...baseEntry,
     source: entry.source,
     headers: entry.headers,
-    lastAccessed: getCurrentTimestamp(),
   };
 };
 
-const findLRUKey = (
+const touchCacheEntry = (key: string, entry: ClientCacheEntry): void => {
+  clientCacheState.clientCache.delete(key);
+  clientCacheState.clientCache.set(key, entry);
+};
+
+const getLRUKey = (
   clientCache: Map<string, ClientCacheEntry>
 ): string | null => {
-  const entries = Array.from(clientCache.entries());
-
-  const oldestEntry = entries.reduce(
-    (oldest, [key, entry]) =>
-      entry.lastAccessed < oldest.lastAccessed
-        ? { key, lastAccessed: entry.lastAccessed }
-        : oldest,
-    { key: '', lastAccessed: Infinity }
-  );
-
-  return oldestEntry.key || null;
+  const iterator = clientCache.keys().next();
+  return iterator.done ? null : iterator.value;
 };
 
 const shouldEvictEntry = (
@@ -108,44 +96,68 @@ const shouldEvictEntry = (
   maxSize: number
 ): boolean => clientCache.size >= maxSize;
 
-const filterByTags = (
-  clientCache: Map<string, ClientCacheEntry>,
-  tags: string[]
-): string[] => {
-  const normalizedTags = normalizeCacheTags(tags);
+const indexTags = (key: string, tags: string[] = []): void => {
+  if (!tags.length) return;
 
-  return Array.from(clientCache.entries())
-    .filter(([, entry]) => {
-      const allEntryTags = entry.clientTags || [];
-      return hasCommonTags(allEntryTags, normalizedTags);
-    })
-    .map(([key]) => key);
+  tags.forEach(tag => {
+    const set = clientCacheState.tagIndex.get(tag) ?? new Set<string>();
+
+    if (!clientCacheState.tagIndex.has(tag)) {
+      clientCacheState.tagIndex.set(tag, set);
+    }
+
+    set.add(key);
+  });
 };
 
-const updateLastAccessed = <T>(
-  entry: ClientCacheEntry<T>
-): ClientCacheEntry<T> => ({
-  ...entry,
-  lastAccessed: getCurrentTimestamp(),
-});
+const unindexTags = (key: string, tags: string[] = []): void => {
+  if (!tags.length) return;
 
-const calculateStats = (clientCache: Map<string, ClientCacheEntry>) => {
-  const entries = Array.from(clientCache.values());
+  tags.forEach(tag => {
+    const set = clientCacheState.tagIndex.get(tag);
 
-  return entries.reduce(
-    (stats, entry) => ({
-      ...stats,
-      expired: stats.expired + (isCacheEntryExpired(entry) ? 1 : 0),
-      bySource: {
-        ...stats.bySource,
-        [entry.source]: stats.bySource[entry.source] + 1,
-      },
-    }),
-    {
-      expired: 0,
-      bySource: { fetch: 0, hydration: 0, manual: 0 },
-    }
-  );
+    if (!set) return;
+
+    set.delete(key);
+
+    if (set.size === 0) clientCacheState.tagIndex.delete(tag);
+  });
+};
+
+const replaceTagsIndex = (
+  key: string,
+  oldTags: string[] = [],
+  newTags: string[] = []
+): void => {
+  if (oldTags.length === 0 && newTags.length === 0) return;
+
+  const oldSet = new Set(oldTags);
+  const newSet = new Set(newTags);
+
+  oldSet.forEach(tag => {
+    if (!newSet.has(tag)) unindexTags(key, [tag]);
+  });
+
+  newSet.forEach(tag => {
+    if (!oldSet.has(tag)) indexTags(key, [tag]);
+  });
+};
+
+const getKeysByTags = (tags: string[]): string[] => {
+  const normalizedTags = normalizeCacheTags(tags);
+  if (!normalizedTags.length) return [];
+
+  const keys = new Set<string>();
+
+  normalizedTags.forEach(tag => {
+    const set = clientCacheState.tagIndex.get(tag);
+
+    if (!set) return;
+
+    set.forEach(key => keys.add(key));
+  });
+
+  return Array.from(keys);
 };
 
 const setClientCache = <T = unknown>(
@@ -155,24 +167,26 @@ const setClientCache = <T = unknown>(
   if (!isClientEnvironment()) return;
 
   if (clientCacheState.clientCache.has(key)) {
-    const updatedEntry = updateLastAccessed(entry);
-    clientCacheState.clientCache.set(key, updatedEntry);
-    notify(key, updatedEntry);
+    touchCacheEntry(key, entry);
+    notify(key, entry);
     return;
   }
 
   if (
     shouldEvictEntry(clientCacheState.clientCache, clientCacheState.maxSize)
   ) {
-    const lruKey = findLRUKey(clientCacheState.clientCache);
+    const lruKey = getLRUKey(clientCacheState.clientCache);
     if (lruKey) {
+      const evicted = clientCacheState.clientCache.get(lruKey);
+      if (evicted?.clientTags?.length) {
+        unindexTags(lruKey, evicted.clientTags);
+      }
       clientCacheState.clientCache.delete(lruKey);
     }
   }
 
-  const updatedEntry = updateLastAccessed(entry);
-  clientCacheState.clientCache.set(key, updatedEntry);
-  notify(key, updatedEntry);
+  touchCacheEntry(key, entry);
+  notify(key, entry);
 };
 
 const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
@@ -192,8 +206,7 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
     return null;
   }
 
-  const updatedEntry = updateLastAccessed(entry);
-  clientCacheState.clientCache.set(key, updatedEntry);
+  touchCacheEntry(key, entry);
 
   trackCache({
     type: 'HIT',
@@ -206,21 +219,22 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
     maxSize: clientCacheState.maxSize,
   });
 
-  return updatedEntry;
+  return entry;
 };
 
 const set = <T = unknown>(
   key: string,
-  entry: Omit<
-    ClientCacheEntry<T>,
-    'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
-  >
+  entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'expiresAt'>
 ): void => {
   if (!isClientEnvironment()) return;
 
   const isUpdated = clientCacheState.clientCache.has(key);
 
   const clientCacheEntry = createClientCacheEntry(entry);
+
+  if (isUpdated) {
+    replaceTagsIndex(key, [], clientCacheEntry.clientTags || []);
+  }
 
   setClientCache(key, clientCacheEntry);
 
@@ -242,9 +256,7 @@ const update = <T = unknown>(
 ): void => {
   if (!isClientEnvironment()) return;
 
-  const existingEntry = clientCacheState.clientCache.get(key) as
-    | ClientCacheEntry<T>
-    | undefined;
+  const existingEntry = clientCacheState.clientCache.get(key);
   if (!existingEntry) return;
 
   const newPartialEntry = {
@@ -276,6 +288,11 @@ const update = <T = unknown>(
 const deleteKey = (key: string): boolean => {
   if (!isClientEnvironment()) return false;
 
+  const existingEntry = clientCacheState.clientCache.get(key);
+  if (existingEntry?.clientTags?.length) {
+    unindexTags(key, existingEntry.clientTags);
+  }
+
   const deleted = clientCacheState.clientCache.delete(key);
   if (deleted) {
     notify(key, null);
@@ -299,27 +316,12 @@ const size = (): number => {
 const revalidateByTags = (tags: string[]): void => {
   if (!isClientEnvironment() || !tags.length) return;
 
-  const keysToDelete = filterByTags(clientCacheState.clientCache, tags);
+  const keysToDelete = getKeysByTags(tags);
   keysToDelete.forEach(key => deleteKey(key));
 };
 
-const getStats = () => {
-  const defaultStats = {
-    size: 0,
-    maxSize: clientCacheState.maxSize,
-    expired: 0,
-    bySource: { fetch: 0, hydration: 0, manual: 0 },
-  };
-
-  if (!isClientEnvironment()) return defaultStats;
-
-  const stats = calculateStats(clientCacheState.clientCache);
-
-  return {
-    size: clientCacheState.clientCache.size,
-    maxSize: clientCacheState.maxSize,
-    ...stats,
-  };
+const getMaxSize = () => {
+  return clientCacheState.maxSize;
 };
 
 const setMaxSize = (newSize: number): void => {
@@ -336,7 +338,7 @@ export const clientCacheStore = {
   delete: deleteKey,
   size,
   revalidateByTags,
-  getStats,
+  getMaxSize,
   subscribe,
   setMaxSize,
 };
