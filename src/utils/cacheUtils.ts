@@ -62,7 +62,6 @@ export const hasCommonTags = (tagsA: string[], tagsB: string[]): boolean => {
 
 export const createCacheEntry = <T>(
   data: T,
-  key: string,
   clientRevalidate: number = 0,
   clientTags: string[] = [],
   serverTags: string[] = [],
@@ -74,7 +73,6 @@ export const createCacheEntry = <T>(
 
   return {
     data,
-    key,
     createdAt: now,
     expiresAt,
     clientRevalidate,

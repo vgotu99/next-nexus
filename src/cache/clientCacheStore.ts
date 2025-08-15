@@ -66,7 +66,6 @@ const subscribe = <T = unknown>(
 };
 
 const createClientCacheEntry = <T>(
-  key: string,
   entry: Omit<
     ClientCacheEntry<T>,
     'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
@@ -74,7 +73,6 @@ const createClientCacheEntry = <T>(
 ): ClientCacheEntry<T> => {
   const baseEntry = createCacheEntry(
     entry.data,
-    key,
     entry.clientRevalidate,
     entry.clientTags,
     entry.serverTags,
@@ -222,7 +220,7 @@ const set = <T = unknown>(
 
   const isUpdated = clientCacheState.clientCache.has(key);
 
-  const clientCacheEntry = createClientCacheEntry(key, entry);
+  const clientCacheEntry = createClientCacheEntry(entry);
 
   setClientCache(key, clientCacheEntry);
 

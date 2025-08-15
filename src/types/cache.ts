@@ -19,7 +19,6 @@ export interface CacheEntry<T = unknown> {
   createdAt: number;
   expiresAt: number;
   etag?: string;
-  key: string;
   clientRevalidate?: number;
   clientTags?: string[];
   serverTags?: string[];
