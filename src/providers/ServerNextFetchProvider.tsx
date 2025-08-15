@@ -2,8 +2,8 @@ import type { ReactNode } from 'react';
 
 import { requestCache } from '@/cache/requestCache';
 import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
-import type { ClientCacheEntry, HydrationData } from '@/types';
-import { getCurrentTimestamp } from '@/utils';
+import type { ClientCacheEntry, HydrationData } from '@/types/cache';
+import { getCurrentTimestamp } from '@/utils/timeUtils';
 
 type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'instance'>;
 

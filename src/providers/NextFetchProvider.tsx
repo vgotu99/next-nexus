@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import ClientNextFetchProvider from '@/providers/ClientNextFetchProvider';
 import ServerNextFetchProvider from '@/providers/ServerNextFetchProvider';
-import { isServerEnvironment } from '@/utils';
+import { isServerEnvironment } from '@/utils/environmentUtils';
 
 export interface NextFetchProviderProps {
   children: ReactNode;

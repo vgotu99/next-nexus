@@ -1,4 +1,3 @@
-import type { NextFetchRequestConfig } from '@/types';
 import type {
   NextFetchDefinition,
   CreateNextFetchDefinitionConfig,
@@ -9,6 +8,7 @@ import type {
   DeleteNextFetchDefinition,
   DefinitionCreator,
 } from '@/types/definition';
+import type { NextFetchRequestConfig } from '@/types/request';
 
 const validateConfig = (definition: NextFetchDefinition): void => {
   const { method, endpoint } = definition;

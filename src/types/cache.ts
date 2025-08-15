@@ -33,7 +33,7 @@ export interface CacheKeyOptions {
 }
 
 export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
-  source: 'fetch' | 'hydration' | 'manual';
+  source?: 'fetch' | 'hydration' | 'manual';
   lastAccessed: number;
   headers?: Record<string, string>;
 }

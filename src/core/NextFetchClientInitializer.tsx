@@ -9,7 +9,7 @@ import {
 } from '@/cache/clientCacheMetadataCollector';
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { HEADERS } from '@/constants/cache';
-import { generateCacheKey } from '@/utils';
+import { generateCacheKey } from '@/utils/cacheUtils';
 
 const safelyParseTags = (tagsHeader: string | null): string[] => {
   if (!tagsHeader) return [];

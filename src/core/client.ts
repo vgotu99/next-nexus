@@ -15,28 +15,30 @@ import {
   trackRequestStart,
   trackRequestSuccess,
 } from '@/debug/tracker';
+import type { ServerCacheOptions } from '@/types/cache';
+import type { NextFetchDefinition } from '@/types/definition';
 import type {
   InterceptorHandler,
   NextFetchInterceptors,
-  NextFetchResponse,
-  ServerCacheOptions,
-} from '@/types';
-import type { NextFetchDefinition } from '@/types/definition';
+} from '@/types/interceptor';
 import type {
   InternalNextFetchRequestConfig,
   InternalNextFetchResponse,
   NextOptions,
 } from '@/types/internal';
+import type { NextFetchResponse } from '@/types/response';
 import {
   applyRequestInterceptors,
   applyResponseInterceptors,
-  executeRequest,
+} from '@/utils/applyInterceptor';
+import { generateCacheKey, generateETag } from '@/utils/cacheUtils';
+import {
   isClientEnvironment,
   isServerEnvironment,
-  setupHeaders,
-} from '@/utils';
-import { generateCacheKey, generateETag } from '@/utils/cacheUtils';
+} from '@/utils/environmentUtils';
+import { executeRequest } from '@/utils/executeRequest';
 import { retry } from '@/utils/retry';
+import { setupHeaders } from '@/utils/setupHeaders';
 
 import {
   createRequestInterceptor,

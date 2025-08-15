@@ -1,4 +1,4 @@
-import type { ClientCacheMetadata } from '@/types';
+import type { ClientCacheMetadata } from '@/types/cache';
 import { isServerEnvironment } from '@/utils/environmentUtils';
 
 const decodeFromHeader = (encodedData: string): string | null => {

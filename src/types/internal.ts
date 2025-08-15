@@ -1,4 +1,6 @@
-import type { NextFetchRequestConfig, NextFetchResponse } from './index';
+import { NextFetchRequestConfig } from "@/types/request";
+import { NextFetchResponse } from "@/types/response";
+
 
 export interface InternalNextFetchRequestConfig extends NextFetchRequestConfig {
   timeoutId?: NodeJS.Timeout;
