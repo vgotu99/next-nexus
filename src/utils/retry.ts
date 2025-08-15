@@ -4,7 +4,7 @@ import { isNextFetchError } from '@/errors/errorFactory';
 import { setupTimeout } from './setupTimeout';
 import { secondsToMs } from './timeUtils';
 
-export type RetryConfig<T> = {
+interface RetryConfig<T> {
   attempt: (config: { signal: AbortSignal }) => Promise<T>;
   maxAttempts: number;
   delaySeconds: number;

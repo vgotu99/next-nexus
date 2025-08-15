@@ -19,7 +19,6 @@ export type CacheEventType =
   | 'SET'
   | 'UPDATE'
   | 'DELETE'
-  | 'CLEAR';
 
 export type CacheSource =
   | 'client-fetch'

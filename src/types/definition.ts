@@ -1,8 +1,8 @@
 import type { NextFetchRequestConfig } from './request';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-export type BaseNextFetchDefinition<TResponse = unknown> =
+type BaseNextFetchDefinition<TResponse = unknown> =
   Readonly<NextFetchRequestConfig> & {
     readonly method: HttpMethod;
     readonly endpoint: string;

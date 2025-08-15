@@ -1,4 +1,4 @@
-import { isValidCacheKey } from '@/utils/cacheUtils';
+import { MAX_CACHE_KEY_LENGTH } from '@/constants/cache';
 import { isServerEnvironment } from '@/utils/environmentUtils';
 
 interface AsyncLocalStorageInterface<T> {
@@ -32,7 +32,8 @@ const getStore = (): CacheStore | null => {
 };
 
 const validateCacheKey = (key: string): boolean => {
-  return isValidCacheKey(key);
+  if (typeof key !== 'string' || !key) return false;
+  return key.length <= MAX_CACHE_KEY_LENGTH && !key.includes('\n');
 };
 
 const createCacheOperationResult = <T>(
@@ -64,31 +65,11 @@ const set = async <T = unknown>(key: string, value: T): Promise<void> => {
   }
 };
 
-const has = async (key: string): Promise<boolean> => {
-  if (!validateCacheKey(key)) {
-    return false;
-  }
-
-  return createCacheOperationResult(getStore(), store => store.has(key), false);
-};
-
 const clear = async (): Promise<void> => {
   const store = getStore();
   if (store) {
     store.clear();
   }
-};
-
-const deleteKey = async (key: string): Promise<boolean> => {
-  if (!validateCacheKey(key)) {
-    return false;
-  }
-
-  return createCacheOperationResult(
-    getStore(),
-    store => store.delete(key),
-    false
-  );
 };
 
 const keys = async (): Promise<string[]> => {
@@ -97,10 +78,6 @@ const keys = async (): Promise<string[]> => {
     store => Array.from(store.keys()),
     []
   );
-};
-
-const size = async (): Promise<number> => {
-  return createCacheOperationResult(getStore(), store => store.size, 0);
 };
 
 const runWith = async <T = unknown>(
@@ -113,31 +90,10 @@ const runWith = async <T = unknown>(
     : await callback();
 };
 
-const debug = async (): Promise<{
-  isServer: boolean;
-  hasStore: boolean;
-  storeSize: number;
-}> => {
-  const isServer = typeof window === 'undefined';
-  const store = getStore();
-  const hasStore = !!store;
-  const storeSize = store ? store.size : 0;
-
-  return {
-    isServer,
-    hasStore,
-    storeSize,
-  };
-};
-
 export const requestCache = {
   get,
   set,
-  has,
   clear,
-  delete: deleteKey,
   keys,
-  size,
   runWith,
-  debug,
 };

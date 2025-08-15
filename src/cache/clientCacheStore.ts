@@ -67,7 +67,10 @@ const subscribe = <T = unknown>(
 
 const createClientCacheEntry = <T>(
   key: string,
-  entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'>
+  entry: Omit<
+    ClientCacheEntry<T>,
+    'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
+  >
 ): ClientCacheEntry<T> => {
   const baseEntry = createCacheEntry(
     entry.data,
@@ -210,16 +213,16 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
 
 const set = <T = unknown>(
   key: string,
-  entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'>
+  entry: Omit<
+    ClientCacheEntry<T>,
+    'key' | 'createdAt' | 'lastAccessed' | 'expiresAt'
+  >
 ): void => {
   if (!isClientEnvironment()) return;
 
   const isUpdated = clientCacheState.clientCache.has(key);
 
-  const clientCacheEntry = createClientCacheEntry(
-    key,
-    entry
-  );
+  const clientCacheEntry = createClientCacheEntry(key, entry);
 
   setClientCache(key, clientCacheEntry);
 
@@ -290,35 +293,6 @@ const deleteKey = (key: string): boolean => {
   return deleted;
 };
 
-const clear = (): void => {
-  if (!isClientEnvironment()) return;
-
-  clientCacheState.clientCache.forEach((_value, key) => {
-    notify(key, null);
-  });
-
-  clientCacheState.clientCache.clear();
-
-  trackCache({
-    type: 'CLEAR',
-    key: 'ALL',
-    source: 'client-manual',
-    size: clientCacheState.clientCache.size,
-    maxSize: clientCacheState.maxSize,
-  });
-};
-
-const keys = (): string[] => {
-  if (!isClientEnvironment()) return [];
-  return Array.from(clientCacheState.clientCache.keys());
-};
-
-const has = (key: string): boolean => {
-  if (!isClientEnvironment()) return false;
-  const entry = get(key);
-  return entry !== null;
-};
-
 const size = (): number => {
   if (!isClientEnvironment()) return 0;
   return clientCacheState.clientCache.size;
@@ -329,23 +303,6 @@ const revalidateByTags = (tags: string[]): void => {
 
   const keysToDelete = filterByTags(clientCacheState.clientCache, tags);
   keysToDelete.forEach(key => deleteKey(key));
-};
-
-const cleanup = (): number => {
-  if (!isClientEnvironment()) return 0;
-
-  const originalSize = size();
-  const expiredKeys: string[] = [];
-
-  clientCacheState.clientCache.forEach((entry, key) => {
-    if (isCacheEntryExpired(entry)) {
-      expiredKeys.push(key);
-    }
-  });
-
-  expiredKeys.forEach(key => deleteKey(key));
-
-  return originalSize - size();
 };
 
 const getStats = () => {
@@ -367,28 +324,6 @@ const getStats = () => {
   };
 };
 
-const autoCleanupState = { intervalId: null as NodeJS.Timeout | null };
-
-const startAutoCleanup = (intervalMs: number = 60000): void => {
-  if (!isClientEnvironment() || autoCleanupState.intervalId) return;
-
-  autoCleanupState.intervalId = setInterval(() => {
-    const removedCount = cleanup();
-    if (removedCount > 0) {
-      console.debug(
-        `${ERROR_MESSAGE_PREFIX} Auto cleanup removed ${removedCount} expired entries`
-      );
-    }
-  }, intervalMs);
-};
-
-const stopAutoCleanup = (): void => {
-  if (autoCleanupState.intervalId) {
-    clearInterval(autoCleanupState.intervalId);
-    autoCleanupState.intervalId = null;
-  }
-};
-
 const setMaxSize = (newSize: number): void => {
   if (!isClientEnvironment()) return;
   if (typeof newSize === 'number' && newSize > 0) {
@@ -401,15 +336,9 @@ export const clientCacheStore = {
   set,
   update,
   delete: deleteKey,
-  clear,
-  keys,
-  has,
   size,
   revalidateByTags,
-  cleanup,
   getStats,
   subscribe,
-  startAutoCleanup,
-  stopAutoCleanup,
   setMaxSize,
 };

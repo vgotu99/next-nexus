@@ -1,6 +1,6 @@
 import type { CacheOptions } from '@/types/cache';
 
-export interface RetryOptions {
+interface RetryOptions {
   count: number;
   delay?: number;
 }

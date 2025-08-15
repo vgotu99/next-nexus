@@ -52,30 +52,6 @@ export const isGetDefinition = <TResponse>(
   return definition.method === 'GET';
 };
 
-export const isPostDefinition = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
-): definition is PostNextFetchDefinition<TResponse> => {
-  return definition.method === 'POST';
-};
-
-export const isPutDefinition = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
-): definition is PutNextFetchDefinition<TResponse> => {
-  return definition.method === 'PUT';
-};
-
-export const isPatchDefinition = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
-): definition is PatchNextFetchDefinition<TResponse> => {
-  return definition.method === 'PATCH';
-};
-
-export const isDeleteDefinition = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
-): definition is DeleteNextFetchDefinition<TResponse> => {
-  return definition.method === 'DELETE';
-};
-
 export const isMutationDefinition = <TResponse>(
   definition: NextFetchDefinition<TResponse>
 ): definition is
@@ -84,10 +60,4 @@ export const isMutationDefinition = <TResponse>(
   | PatchNextFetchDefinition<TResponse>
   | DeleteNextFetchDefinition<TResponse> => {
   return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(definition.method);
-};
-
-export const resolveDefinitionEndpoint = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
-): string => {
-  return definition.endpoint;
 };

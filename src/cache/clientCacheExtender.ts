@@ -3,7 +3,7 @@ import { getCurrentTimestamp } from '@/utils/timeUtils';
 
 export const extendCacheEntryTTL = (
   cacheKey: string,
-  extensionSeconds: number,
+  extensionSeconds: number
 ): boolean => {
   const entry = clientCacheStore.get(cacheKey);
 
@@ -17,17 +17,4 @@ export const extendCacheEntryTTL = (
   });
 
   return true;
-};
-
-export const extendCacheEntriesTTL = (
-  cacheKeys: string[],
-  extensionSeconds: number,
-): number => {
-  if (!cacheKeys.length) {
-    return 0;
-  }
-
-  const results = cacheKeys.map(key => extendCacheEntryTTL(key, extensionSeconds));
-
-  return results.filter(Boolean).length;
 };

@@ -17,10 +17,6 @@ export interface NextFetchResponseInterceptor<T> {
   onRejected?: InterceptorHandler<unknown>;
 }
 
-export interface NextFetchInterceptorOptions {
-  interceptors?: string[];
-}
-
 export interface NextFetchInterceptors {
   request: {
     use: (

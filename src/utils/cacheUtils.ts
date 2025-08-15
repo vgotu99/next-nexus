@@ -1,4 +1,3 @@
-import { MAX_CACHE_KEY_LENGTH } from '@/constants/cache';
 import type { CacheKeyOptions, CacheEntry } from '@/types/cache';
 import type { GetNextFetchDefinition } from '@/types/definition';
 import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
@@ -94,9 +93,4 @@ export const generateETag = (data: unknown): string => {
   }, 0);
 
   return `W/"${Math.abs(hash).toString(36)}"`;
-};
-
-export const isValidCacheKey = (key: string): boolean => {
-  if (typeof key !== 'string' || !key) return false;
-  return key.length <= MAX_CACHE_KEY_LENGTH && !key.includes('\n');
 };
