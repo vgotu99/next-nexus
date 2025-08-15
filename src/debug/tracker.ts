@@ -4,7 +4,9 @@ import {
   createRequestEvent,
 } from '@/debug/eventStream';
 import type { CacheEvent, RequestEvent } from '@/types/debug';
+import { isServerEnvironment } from '@/utils/environmentUtils';
 import { logger } from '@/utils/logger';
+import { msToSeconds } from '@/utils/timeUtils';
 
 interface PublishRequestStartParams {
   url: string;
@@ -54,7 +56,7 @@ const logCacheEvent = (event: CacheEvent): void => {
   const details: string[] = [];
 
   if (duration !== undefined) {
-    details.push(`duration: ${duration}ms`);
+    details.push(`duration: ${msToSeconds(duration)}s`);
   }
   if (status !== undefined) {
     details.push(`status: ${status}`);
@@ -81,15 +83,34 @@ const logCacheEvent = (event: CacheEvent): void => {
 };
 
 const logRequestEvent = (event: RequestEvent): void => {
-  const message = `Request ${event.type}: ${event.method} ${event.url}`;
-  const data = {
-    duration: event.duration,
-    status: event.status,
-    error: event.error,
-    requestSize: event.requestSize,
-    responseSize: event.responseSize,
-  };
-  logger.debug('Request', message, data);
+  const sourceName = isServerEnvironment() ? 'SERVER' : 'CLIENT';
+
+  const { type, url, method, duration, status, error, responseSize } = event;
+
+  const details: string[] = [];
+
+  if (duration !== undefined) {
+    details.push(`duration: ${msToSeconds(duration)}s`);
+  }
+
+  if (status !== undefined) {
+    details.push(`status: ${status})}`);
+  }
+
+  if (error !== undefined) {
+    details.push(`error: ${error})}`);
+  }
+
+  if (responseSize !== undefined) {
+    details.push(`responseSize: ${responseSize})}`);
+  }
+
+  const message = [
+    `[${sourceName}] [${type}] ${method}: ${url}`,
+    ...(details.length > 0 ? [details.join(' | ')] : []),
+  ].join(' | ');
+
+  logger.debug('Request', message);
 };
 
 cacheEventStream.subscribe(logCacheEvent);

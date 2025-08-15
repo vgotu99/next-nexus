@@ -50,7 +50,6 @@ export interface RequestEvent {
   duration?: number;
   status?: number;
   error?: string;
-  requestSize?: number;
   responseSize?: number;
 }
 
