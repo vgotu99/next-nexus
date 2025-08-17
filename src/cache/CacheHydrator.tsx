@@ -2,8 +2,9 @@
 
 import { useEffect } from 'react';
 
+import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import type { HydrationData } from '@/types/cache';
+import type { ExtendTTLData, HydrationData } from '@/types/cache';
 import { isClientEnvironment, isDevelopment } from '@/utils/environmentUtils';
 
 const getHydrationData = (): HydrationData | null => {
@@ -15,6 +16,32 @@ const getHydrationData = (): HydrationData | null => {
     console.warn('Failed to parse hydration data:', error);
 
     return null;
+  }
+};
+
+const getExtendTTLData = (): ExtendTTLData | null => {
+  try {
+    return isClientEnvironment() && window.__NEXT_FETCH_EXTEND_TTL__
+      ? window.__NEXT_FETCH_EXTEND_TTL__
+      : null;
+  } catch (error) {
+    console.warn('Failed to parse extend TTL data:', error);
+    return null;
+  }
+};
+
+const cleanupExtendTTLResources = (): void => {
+  try {
+    if (!isClientEnvironment()) return;
+
+    delete window.__NEXT_FETCH_EXTEND_TTL__;
+
+    const scriptElement = document.getElementById('__NEXT_FETCH_EXTEND_TTL__');
+    if (scriptElement) {
+      scriptElement.remove();
+    }
+  } catch (error) {
+    console.warn('Failed to cleanup extend TTL data:', error);
   }
 };
 
@@ -77,10 +104,31 @@ const hydrateClientCache = (hydrationData: HydrationData): number => {
   }
 };
 
+const applyExtendTTL = (extendData: ExtendTTLData): number => {
+  try {
+    const items = Object.entries(extendData);
+    items.forEach(([key, seconds]) => {
+      if (seconds > 0) {
+        extendCacheEntryTTL(key, seconds);
+      }
+    });
+    return items.length;
+  } catch (error) {
+    return 0;
+  }
+};
+
 const logHydrationResult = (count: number): void => {
   const shouldLog = count > 0 && isDevelopment();
   if (shouldLog) {
-    console.log(`[NextFetch] Hydrated ${count} cache entries`);
+    console.warn(`[NextFetch] Hydrated ${count} cache entries`);
+  }
+};
+
+const logExtendTTLResult = (count: number): void => {
+  const shouldLog = count > 0 && isDevelopment();
+  if (shouldLog) {
+    console.warn(`[NextFetch] Extended TTL for ${count} entries`);
   }
 };
 
@@ -96,12 +144,20 @@ const performHydration = (): void => {
   if (!isClientEnvironment()) return;
 
   const hydrationData = getHydrationData();
-  if (!hydrationData) return;
+  const extendTTLData = getExtendTTLData();
 
-  const hydratedCount = hydrateClientCache(hydrationData);
+  if (hydrationData) {
+    const hydratedCount = hydrateClientCache(hydrationData);
+    logHydrationResult(hydratedCount);
+    cleanupHydrationResources();
+  }
 
-  logHydrationResult(hydratedCount);
-  cleanupHydrationResources();
+  if (extendTTLData) {
+    const extendedCount = applyExtendTTL(extendTTLData);
+    logExtendTTLResult(extendedCount);
+    cleanupExtendTTLResources();
+  }
+
   setupDevelopmentDebug();
 };
 

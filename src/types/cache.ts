@@ -63,3 +63,5 @@ export interface CacheHandler<TData = unknown> {
   isStale(): boolean;
   subscribe(callback: (data: TData | undefined) => void): () => void;
 }
+
+export type ExtendTTLData = Record<string, number>;

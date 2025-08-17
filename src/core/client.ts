@@ -1,13 +1,11 @@
 import { performance } from 'perf_hooks';
 
-import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
-import { clientCacheStore } from '@/cache/clientCacheStore';
 import { requestCache } from '@/cache/requestCache';
 import {
   extractClientCacheMetadataFromHeaders,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
-import { createConditionalResponse } from '@/cache/serverETagValidator';
+import { isClientETagMatched } from '@/cache/serverETagValidator';
 import { HEADERS } from '@/constants/cache';
 import {
   trackCache,
@@ -15,7 +13,7 @@ import {
   trackRequestStart,
   trackRequestSuccess,
 } from '@/debug/tracker';
-import type { ServerCacheOptions } from '@/types/cache';
+import type { ExtendTTLData, ServerCacheOptions } from '@/types/cache';
 import type { NextFetchDefinition } from '@/types/definition';
 import type {
   InterceptorHandler,
@@ -32,10 +30,7 @@ import {
   applyResponseInterceptors,
 } from '@/utils/applyInterceptor';
 import { generateCacheKey, generateETag } from '@/utils/cacheUtils';
-import {
-  isClientEnvironment,
-  isServerEnvironment,
-} from '@/utils/environmentUtils';
+import { isServerEnvironment } from '@/utils/environmentUtils';
 import { executeRequest } from '@/utils/executeRequest';
 import { retry } from '@/utils/retry';
 import { setupHeaders } from '@/utils/setupHeaders';
@@ -157,27 +152,6 @@ const shouldSkipRequest = (
   return hasClientCacheEntryByCacheKey(validClientCache, cacheKey);
 };
 
-const getConditionalResponse = (
-  headers: Headers,
-  response: InternalNextFetchResponse<unknown>,
-  method?: string
-): { shouldSkip: boolean; response?: Response } => {
-  if (method?.toUpperCase() !== 'GET') {
-    return { shouldSkip: false };
-  }
-
-  const expiredClientCacheMetadata = extractClientCacheMetadataFromHeaders(
-    headers,
-    HEADERS.REQUEST_ETAG
-  );
-
-  if (!expiredClientCacheMetadata) {
-    return { shouldSkip: false };
-  }
-
-  return createConditionalResponse(response.data, expiredClientCacheMetadata);
-};
-
 const createInterceptorInterface = (
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
@@ -233,6 +207,10 @@ const executeRequestWithLifecycle = async <T>(
   );
 
   const headers = new Headers(modifiedConfig.headers);
+  const expiredClientCacheMetadata = extractClientCacheMetadataFromHeaders(
+    headers,
+    HEADERS.REQUEST_ETAG
+  );
 
   if (isServerEnvironment() && modifiedConfig.headers) {
     if (
@@ -269,40 +247,57 @@ const executeRequestWithLifecycle = async <T>(
       timeoutSeconds: modifiedConfig.timeout ?? 10,
     });
 
-    if (isServerEnvironment() && response.data && headers) {
-      const conditionalResult = getConditionalResponse(
-        headers,
-        response,
-        modifiedConfig.method
+    const responseWithETag = addResponseETagToResponseHeaders(response);
+
+    const shouldSkipHydrationForThisKey =
+      isServerEnvironment() &&
+      responseWithETag.data &&
+      expiredClientCacheMetadata;
+
+    if (shouldSkipHydrationForThisKey) {
+      const matched = isClientETagMatched(
+        responseWithETag.data,
+        expiredClientCacheMetadata
       );
 
-      if (conditionalResult.shouldSkip && conditionalResult.response) {
-        trackCache({
-          type: 'MATCH',
-          key: `${config.method?.toUpperCase() || 'GET'}: ${url}`,
-          source: 'server',
-          tags: modifiedConfig.client?.tags,
-          revalidate: modifiedConfig.client?.revalidate,
-          ttl: modifiedConfig.client?.revalidate || 0,
+      if (matched) {
+        const cacheKey = generateCacheKey({
+          endpoint: url,
+          method: modifiedConfig.method,
+          clientTags: modifiedConfig.client?.tags,
+          serverTags: modifiedConfig.server?.tags,
         });
 
-        const notModifiedResponse: InternalNextFetchResponse<
-          T | null | undefined
-        > = {
-          ...conditionalResult.response,
-          data: null,
-          config: modifiedConfig,
-          request: new Request(url, modifiedConfig),
-          clone: () => notModifiedResponse,
-        };
+        const current =
+          (await requestCache.get<ExtendTTLData>(
+            '__NEXT_FETCH_EXTEND_TTL__'
+          )) || {};
+        const prev = current[cacheKey] ?? 0;
+        current[cacheKey] = Math.max(
+          prev,
+          modifiedConfig.client?.revalidate || 0
+        );
 
-        return notModifiedResponse;
+        await requestCache.set('__NEXT_FETCH_EXTEND_TTL__', current);
+
+        if (current[cacheKey] > 0) {
+          trackCache({
+            type: 'MATCH',
+            key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+            source: 'server',
+            tags: modifiedConfig.client?.tags,
+            revalidate: modifiedConfig.client?.revalidate,
+            ttl: modifiedConfig.client?.revalidate || 0,
+          });
+        }
       }
     }
 
-    const responseWithETag = addResponseETagToResponseHeaders(response);
-
-    if (isServerEnvironment() && responseWithETag.data) {
+    if (
+      isServerEnvironment() &&
+      responseWithETag.data &&
+      !shouldSkipHydrationForThisKey
+    ) {
       const etag = responseWithETag.headers.get(HEADERS.RESPONSE_ETAG);
 
       const cachedResponseHeaders =
@@ -404,28 +399,6 @@ const executeRequestWithLifecycle = async <T>(
         method: config.method || 'GET',
         duration,
         error: `HTTP ${finalResponse.status}`,
-      });
-    }
-
-    if (isClientEnvironment() && finalResponse.status === 304) {
-      const cacheKey = generateCacheKey({
-        endpoint: url,
-        method: modifiedConfig.method,
-        clientTags: modifiedConfig.client?.tags,
-        serverTags: modifiedConfig.server?.tags,
-      });
-
-      extendCacheEntryTTL(cacheKey, config.client?.revalidate || 0);
-
-      trackCache({
-        type: 'UPDATE',
-        key: cacheKey,
-        source: 'client-fetch',
-        tags: config.client?.tags,
-        revalidate: config.client?.revalidate,
-        ttl: config.client?.revalidate || 0,
-        size: clientCacheStore.size(),
-        maxSize: clientCacheStore.getMaxSize(),
       });
     }
 
