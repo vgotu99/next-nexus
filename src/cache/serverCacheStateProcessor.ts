@@ -51,5 +51,5 @@ export const hasClientCacheEntryByCacheKey = (
   clientCacheMetadata: ClientCacheMetadata,
   cacheKey: string
 ): boolean => {
-  return clientCacheMetadata.key === cacheKey;
+  return clientCacheMetadata.cacheKey === cacheKey;
 };

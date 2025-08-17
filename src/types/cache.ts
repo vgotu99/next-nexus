@@ -32,7 +32,7 @@ export interface CacheKeyOptions {
 }
 
 export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
-  source?: 'fetch' | 'hydration' | 'manual';
+  source: 'fetch' | 'hydration' | 'manual';
   headers?: Record<string, string>;
 }
 
@@ -45,10 +45,15 @@ export interface ClientCacheState {
 export type CacheRevalidateTime = number | false;
 
 export interface HydrationData {
-  [cacheKey: string]: Omit<ClientCacheEntry, 'key' | 'createdAt' | 'expiresAt'>;
+  [cacheKey: string]: Omit<
+    ClientCacheEntry,
+    'key' | 'createdAt' | 'expiresAt' | 'source'
+  >;
 }
 
-export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'>;
+export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'> & {
+  cacheKey: string;
+};
 
 export interface CacheHandler<TData = unknown> {
   get(): TData | undefined;

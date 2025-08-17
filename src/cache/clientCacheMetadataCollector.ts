@@ -32,6 +32,7 @@ const serializeClientCacheMetadata = (
 };
 
 export const collectValidClientCacheMetadata = (
+  cacheKey: string,
   clientCacheEntry: ClientCacheEntry
 ): ClientCacheMetadata | null => {
   if (!isClientEnvironment() || isCacheEntryExpired(clientCacheEntry)) {
@@ -39,7 +40,7 @@ export const collectValidClientCacheMetadata = (
   }
 
   return {
-    key: clientCacheEntry.key,
+    cacheKey,
     expiresAt: clientCacheEntry.expiresAt,
     clientTags: clientCacheEntry.clientTags?.length
       ? clientCacheEntry.clientTags
@@ -53,6 +54,7 @@ export const collectValidClientCacheMetadata = (
 };
 
 export const collectExpiredClientCacheMetadata = (
+  cacheKey: string,
   clientCacheEntry: ClientCacheEntry
 ): ClientCacheMetadata | null => {
   if (
@@ -64,7 +66,7 @@ export const collectExpiredClientCacheMetadata = (
   }
 
   return {
-    key: clientCacheEntry.key,
+    cacheKey,
     etag: clientCacheEntry.etag,
     expiresAt: clientCacheEntry.expiresAt,
     clientRevalidate: clientCacheEntry.clientRevalidate,

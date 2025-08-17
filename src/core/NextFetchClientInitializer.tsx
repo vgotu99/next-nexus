@@ -72,10 +72,12 @@ const initializeRscRequestInterceptor = (): (() => void) => {
     }
 
     const validClientCacheMetadata = collectValidClientCacheMetadata(
+      currentRequestCacheKey,
       currentRequestClientCacheEntry
     );
 
     const expiredClientCacheMetadata = collectExpiredClientCacheMetadata(
+      currentRequestCacheKey,
       currentRequestClientCacheEntry
     );
 
