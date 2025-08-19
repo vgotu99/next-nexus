@@ -1,124 +1,98 @@
-import type { ReactNode } from 'react';
-
-import { requestCache } from '@/cache/requestCache';
 import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
-import type {
-  ClientCacheEntry,
-  ExtendTTLData,
-  HydrationData,
-} from '@/types/cache';
+import {
+  getNotModifiedKeys,
+  runWithNotModifiedContext,
+} from '@/scope/notModifiedContext';
+import { requestScopeStore } from '@/scope/requestScopeStore';
+import type { ClientCacheEntry } from '@/types/cache';
+import { NextFetchPayload } from '@/types/payload';
 
-type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'instance'>;
+type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'maxSize'>;
 
-const generateHydrationScript = (data: HydrationData): string => {
-  const serializedData = JSON.stringify(data);
+const collectHydrationData = async (notModifiedKeys: readonly string[]) => {
+  const allCacheKeys = await requestScopeStore.keys();
+  const notModifiedSet = new Set(notModifiedKeys);
 
-  return `<script id="__NEXT_FETCH_HYDRATION__">
-    window.__NEXT_FETCH_HYDRATION__ = ${serializedData};
-  </script>`;
+  const hydrationCandidateKeys = allCacheKeys.filter(
+    key => !notModifiedSet.has(key) && !key.startsWith('__NEXT_FETCH_')
+  );
+
+  const hydrationEntries = await Promise.all(
+    hydrationCandidateKeys.map(async key => {
+      const entry = await requestScopeStore.get<ClientCacheEntry>(key);
+
+      if (!entry) return null;
+
+      return [
+        key,
+        {
+          data: entry.data,
+          clientRevalidate: entry.clientRevalidate,
+          clientTags: entry.clientTags,
+          serverTags: entry.serverTags,
+          etag: entry.etag,
+          headers: entry.headers,
+        },
+      ] as const;
+    })
+  );
+
+  const validEntries = hydrationEntries.filter(
+    (entry): entry is NonNullable<typeof entry> => entry !== null
+  );
+
+  return Object.fromEntries(validEntries);
 };
 
-const generateExtendTTLScript = (data: ExtendTTLData): string => {
-  const serializedData = JSON.stringify(data);
-
-  return `<script id="__NEXT_FETCH_EXTEND_TTL__">
-    window.__NEXT_FETCH_EXTEND_TTL__ = ${serializedData};
-  </script>`;
+const hasPayloadContent = (payload: NextFetchPayload): boolean => {
+  return (
+    Object.keys(payload.hydrationData).length > 0 ||
+    payload.notModifiedKeys.length > 0
+  );
 };
 
-const collectHydrationData = async (): Promise<HydrationData> => {
+export const HydrationScript = async () => {
   try {
-    const keys = await requestCache.keys();
+    const notModifiedKeys = getNotModifiedKeys();
 
-    const hydrationEntries = await Promise.all(
-      keys.map(async key => {
-        const entry = await requestCache.get<ClientCacheEntry>(key);
+    const hydrationData = await collectHydrationData(notModifiedKeys);
 
-        if (!entry) {
-          return null;
-        }
+    const payload: NextFetchPayload = {
+      hydrationData,
+      notModifiedKeys,
+    };
 
-        return [
-          key,
-          {
-            data: entry.data,
-            clientRevalidate: entry.clientRevalidate,
-            clientTags: entry.clientTags,
-            serverTags: entry.serverTags,
-            etag: entry.etag,
-            headers: entry.headers,
-          },
-        ] as const;
-      })
+    if (!hasPayloadContent(payload)) {
+      return null;
+    }
+
+    const serializedPayload = JSON.stringify(payload);
+
+    return (
+      <script
+        id='__NEXT_FETCH_SCRIPT__'
+        dangerouslySetInnerHTML={{
+          __html: `window.__NEXT_FETCH_PAYLOAD__ = ${serializedPayload};`,
+        }}
+      />
     );
-
-    const validEntries = hydrationEntries.filter(
-      (entry): entry is NonNullable<typeof entry> => entry !== null
-    );
-
-    return Object.fromEntries(validEntries);
   } catch (error) {
-    console.warn(
-      '[next-fetch] Failed to collect cache data for hydration:',
-      error
-    );
-    return {};
+    console.warn('[next-fetch] Failed to generate hydration script:', error);
+    return null;
   }
 };
 
-export const collectExtendTTLData = async (): Promise<ExtendTTLData> => {
-  const extendTTLData = await requestCache.get<ExtendTTLData>(
-    '__NEXT_FETCH_EXTEND_TTL__'
-  );
-
-  return extendTTLData || {};
-};
-
-const createHydrationScript = (hydrationData: HydrationData): ReactNode => {
-  const hasData = Object.keys(hydrationData).length > 0;
-
-  return hasData ? (
-    <div
-      dangerouslySetInnerHTML={{
-        __html: generateHydrationScript(hydrationData),
-      }}
-    />
-  ) : null;
-};
-
-const createExtendTTLScript = (extendData: ExtendTTLData): ReactNode => {
-  const hasData = Object.keys(extendData).length > 0;
-
-  return hasData ? (
-    <div
-      dangerouslySetInnerHTML={{
-        __html: generateExtendTTLScript(extendData),
-      }}
-    />
-  ) : null;
-};
-
-const ServerNextFetchProvider = async ({
+const ServerNextFetchProvider = ({
   children,
 }: ServerNextFetchProviderProps) => {
-  const content = await requestCache.runWith(async () => {
-    const renderedChildren = <>{children}</>;
-
-    const hydrationData = await collectHydrationData();
-    const extendTTLData = await collectExtendTTLData();
-    const hydrationScript = createHydrationScript(hydrationData);
-    const extendTTLScript = createExtendTTLScript(extendTTLData);
-
-    return (
+  return requestScopeStore.runWith(() =>
+    runWithNotModifiedContext(() => (
       <>
-        {renderedChildren}
-        {hydrationScript}
-        {extendTTLScript}
+        {children}
+        <HydrationScript />
       </>
-    );
-  });
-
-  return content;
+    ))
+  );
 };
 
 export default ServerNextFetchProvider;

@@ -1,9 +1,8 @@
-import type { ExtendTTLData, HydrationData } from './cache';
+import type { NextFetchPayload } from './payload';
 
 declare global {
   interface Window {
-    __NEXT_FETCH_HYDRATION__?: HydrationData;
-    __NEXT_FETCH_EXTEND_TTL__?: ExtendTTLData;
+    __NEXT_FETCH_PAYLOAD__?: NextFetchPayload;
   }
 }
 
