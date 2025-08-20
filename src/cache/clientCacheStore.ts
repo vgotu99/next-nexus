@@ -2,7 +2,11 @@ import { DEFAULT_CLIENT_CACHE_MAX_SIZE } from '@/constants/cache';
 import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import { trackCache } from '@/debug/tracker';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
-import { createCacheEntry, normalizeCacheTags } from '@/utils/cacheUtils';
+import {
+  createCacheEntry,
+  extractBaseKeyFromCacheKey,
+  normalizeCacheTags,
+} from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
 
@@ -15,6 +19,7 @@ declare global {
 const clientCacheState: ClientCacheState = {
   clientCache: new Map(),
   tagIndex: new Map(),
+  baseKeyIndex: new Map(),
   maxSize: DEFAULT_CLIENT_CACHE_MAX_SIZE,
 };
 
@@ -124,23 +129,27 @@ const unindexTags = (key: string, tags: string[] = []): void => {
   });
 };
 
-const replaceTagsIndex = (
-  key: string,
-  oldTags: string[] = [],
-  newTags: string[] = []
-): void => {
-  if (oldTags.length === 0 && newTags.length === 0) return;
+const indexBaseKey = (cacheKey: string): void => {
+  const baseKey = extractBaseKeyFromCacheKey(cacheKey);
+  const set = clientCacheState.baseKeyIndex.get(baseKey) ?? new Set<string>();
 
-  const oldSet = new Set(oldTags);
-  const newSet = new Set(newTags);
+  set.add(cacheKey);
 
-  oldSet.forEach(tag => {
-    if (!newSet.has(tag)) unindexTags(key, [tag]);
-  });
+  if (!clientCacheState.baseKeyIndex.has(baseKey)) {
+    clientCacheState.baseKeyIndex.set(baseKey, set);
+  }
+};
 
-  newSet.forEach(tag => {
-    if (!oldSet.has(tag)) indexTags(key, [tag]);
-  });
+const unindexBaseKey = (cacheKey: string): void => {
+  const baseKey = extractBaseKeyFromCacheKey(cacheKey);
+  const set = clientCacheState.baseKeyIndex.get(baseKey);
+
+  if (!set) return;
+
+  set.delete(cacheKey);
+  if (set.size === 0) {
+    clientCacheState.baseKeyIndex.delete(baseKey);
+  }
 };
 
 const getKeysByTags = (tags: string[]): string[] => {
@@ -181,10 +190,13 @@ const setClientCache = <T = unknown>(
       if (evicted?.clientTags?.length) {
         unindexTags(lruKey, evicted.clientTags);
       }
+      unindexBaseKey(lruKey);
       clientCacheState.clientCache.delete(lruKey);
     }
   }
 
+  indexTags(key, entry.clientTags);
+  indexBaseKey(key);
   touchCacheEntry(key, entry);
   notify(key, entry);
 };
@@ -231,10 +243,6 @@ const set = <T = unknown>(
   const isUpdated = clientCacheState.clientCache.has(key);
 
   const clientCacheEntry = createClientCacheEntry(entry);
-
-  if (isUpdated) {
-    replaceTagsIndex(key, [], clientCacheEntry.clientTags || []);
-  }
 
   setClientCache(key, clientCacheEntry);
 
@@ -295,6 +303,7 @@ const deleteKey = (key: string): boolean => {
 
   const deleted = clientCacheState.clientCache.delete(key);
   if (deleted) {
+    unindexBaseKey(key);
     notify(key, null);
     trackCache({
       type: 'DELETE',
@@ -331,6 +340,10 @@ const setMaxSize = (newSize: number): void => {
   }
 };
 
+const getCacheKeysFromBaseKey = (baseKey: string) => {
+  return clientCacheState.baseKeyIndex.get(baseKey);
+};
+
 export const clientCacheStore = {
   get,
   set,
@@ -341,4 +354,5 @@ export const clientCacheStore = {
   getMaxSize,
   subscribe,
   setMaxSize,
+  getCacheKeysFromBaseKey,
 };
