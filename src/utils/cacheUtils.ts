@@ -13,13 +13,20 @@ const buildTagsComponent = (
   return `tags:${sortedTags}`;
 };
 
+export const generateBaseKey = ({
+  url,
+  method = 'GET',
+}: Omit<CacheKeyOptions, 'clientTags' | 'serverTags'>): string => {
+  return `${method.toUpperCase()}:${url}`;
+};
+
 export const generateCacheKey = ({
-  endpoint,
+  url,
   method = 'GET',
   clientTags,
   serverTags,
 }: CacheKeyOptions): string => {
-  const baseKey = `${method.toUpperCase()}:${endpoint}`;
+  const baseKey = generateBaseKey({ url, method });
   const tagsComponent = buildTagsComponent(clientTags, serverTags);
 
   return [baseKey, tagsComponent].filter(Boolean).join('|');
@@ -33,11 +40,15 @@ export const generateCacheKeyFromDefinition = (
   const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
 
   return generateCacheKey({
-    endpoint: url,
+    url,
     method,
     clientTags: client?.tags,
     serverTags: server?.tags,
   });
+};
+
+export const extractBaseKeyFromCacheKey = (cacheKey: string): string => {
+  return cacheKey.split('|')[0];
 };
 
 export const isCacheEntryExpired = (entry: CacheEntry): boolean =>

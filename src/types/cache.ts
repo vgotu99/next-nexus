@@ -25,7 +25,7 @@ export interface CacheEntry<T = unknown> {
 }
 
 export interface CacheKeyOptions {
-  endpoint: string;
+  url: string;
   method?: string;
   clientTags?: string[];
   serverTags?: string[];
@@ -39,6 +39,7 @@ export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
 export interface ClientCacheState {
   clientCache: Map<string, ClientCacheEntry>;
   tagIndex: Map<string, Set<string>>;
+  baseKeyIndex: Map<string, Set<string>>;
   maxSize: number;
 }
 
@@ -51,9 +52,12 @@ export interface HydrationData {
   >;
 }
 
-export type ClientCacheMetadata = Omit<CacheEntry, 'data' | 'createdAt'> & {
+export interface ClientCacheMetadata {
+  state: 'fresh' | 'stale';
   cacheKey: string;
-};
+  etag?: string;
+  version?: number;
+}
 
 export interface CacheHandler<TData = unknown> {
   get(): TData | undefined;
