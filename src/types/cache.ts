@@ -53,10 +53,9 @@ export interface HydrationData {
 }
 
 export interface ClientCacheMetadata {
-  state: 'fresh' | 'stale';
+  ttl: number;
   cacheKey: string;
   etag?: string;
-  version?: number;
 }
 
 export interface CacheHandler<TData = unknown> {

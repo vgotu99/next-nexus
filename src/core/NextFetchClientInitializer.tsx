@@ -3,30 +3,13 @@
 import { useEffect, type ReactNode } from 'react';
 
 import {
-  collectExpiredClientCacheMetadata,
-  collectValidClientCacheMetadata,
+  collectClientCacheMetadata,
   createClientCacheMetadataHeader,
 } from '@/cache/clientCacheMetadataCollector';
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { HEADERS } from '@/constants/cache';
-import { generateCacheKey } from '@/utils/cacheUtils';
-
-const safelyParseTags = (tagsHeader: string | null): string[] => {
-  if (!tagsHeader) return [];
-  try {
-    const tags = JSON.parse(tagsHeader);
-    return Array.isArray(tags) ? tags : [];
-  } catch (error) {
-    console.error(
-      '[next-fetch] Failed to parse cache tags. Defaulting to an empty array.',
-      {
-        tagsHeader,
-        error,
-      }
-    );
-    return [];
-  }
-};
+import type { ClientCacheMetadata } from '@/types/cache';
+import { generateBaseKey } from '@/utils/cacheUtils';
 
 const initializeRscRequestInterceptor = (): (() => void) => {
   const originalFetch = window.fetch;
@@ -53,51 +36,33 @@ const initializeRscRequestInterceptor = (): (() => void) => {
           ? input.url
           : input.toString();
     const method = init?.method || 'GET';
-    const clientTags = safelyParseTags(headers.get(HEADERS.CLIENT_TAGS));
-    const serverTags = safelyParseTags(headers.get(HEADERS.SERVER_TAGS));
 
-    const currentRequestCacheKey = generateCacheKey({
-      endpoint: url,
-      method,
-      clientTags,
-      serverTags,
-    });
+    const baseKey = generateBaseKey({ url, method });
 
-    const currentRequestClientCacheEntry = clientCacheStore.get<unknown>(
-      currentRequestCacheKey
-    );
+    const candidatekeys = clientCacheStore.getCacheKeysFromBaseKey(baseKey);
 
-    if (!currentRequestClientCacheEntry) {
+    if (!candidatekeys || candidatekeys.size === 0) {
       return originalFetch(input, init);
     }
 
-    const validClientCacheMetadata = collectValidClientCacheMetadata(
-      currentRequestCacheKey,
-      currentRequestClientCacheEntry
-    );
+    const clientCacheMetadataArr = Array.from(candidatekeys)
+      .map(cacheKey => {
+        const entry = clientCacheStore.get(cacheKey);
 
-    const expiredClientCacheMetadata = collectExpiredClientCacheMetadata(
-      currentRequestCacheKey,
-      currentRequestClientCacheEntry
-    );
+        if (!entry) return null;
 
-    const validClientCacheMetadataHeader = validClientCacheMetadata
-      ? createClientCacheMetadataHeader(validClientCacheMetadata)
-      : null;
+        return collectClientCacheMetadata(cacheKey, entry);
+      })
+      .filter((metaData): metaData is ClientCacheMetadata => metaData !== null);
 
-    const expiredClientCacheMetadataHeader = expiredClientCacheMetadata
-      ? createClientCacheMetadataHeader(expiredClientCacheMetadata)
-      : null;
+    const clientCacheMetadataHeader =
+      clientCacheMetadataArr.length > 0
+        ? createClientCacheMetadataHeader(clientCacheMetadataArr)
+        : null;
 
-    if (validClientCacheMetadataHeader) {
-      headers.set(HEADERS.CLIENT_CACHE, validClientCacheMetadataHeader);
-    }
+    if (clientCacheMetadataHeader) {
+      headers.set(HEADERS.CLIENT_CACHE, clientCacheMetadataHeader);
 
-    if (expiredClientCacheMetadataHeader) {
-      headers.set(HEADERS.REQUEST_ETAG, expiredClientCacheMetadataHeader);
-    }
-
-    if (validClientCacheMetadataHeader || expiredClientCacheMetadataHeader) {
       const modifiedInit = { ...init, headers };
       return originalFetch(input, modifiedInit);
     }

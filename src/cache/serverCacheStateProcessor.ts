@@ -1,3 +1,4 @@
+import { HEADERS } from '@/constants/cache';
 import type { ClientCacheMetadata } from '@/types/cache';
 import { isServerEnvironment } from '@/utils/environmentUtils';
 
@@ -12,7 +13,7 @@ const decodeFromHeader = (encodedData: string): string | null => {
 
 const parseClientCacheMetadata = (
   serializedData: string
-): ClientCacheMetadata | null => {
+): ClientCacheMetadata[] | null => {
   try {
     return JSON.parse(serializedData);
   } catch (error) {
@@ -22,14 +23,13 @@ const parseClientCacheMetadata = (
 };
 
 export const extractClientCacheMetadataFromHeaders = (
-  headers: Headers,
-  headerName: string
-): ClientCacheMetadata | null => {
+  headers: Headers
+): ClientCacheMetadata[] | null => {
   if (!isServerEnvironment()) {
     return null;
   }
 
-  const headerValue = headers.get(headerName);
+  const headerValue = headers.get(HEADERS.CLIENT_CACHE);
   if (!headerValue) {
     return null;
   }
@@ -50,6 +50,16 @@ export const extractClientCacheMetadataFromHeaders = (
 export const hasClientCacheEntryByCacheKey = (
   clientCacheMetadata: ClientCacheMetadata,
   cacheKey: string
-): boolean => {
-  return clientCacheMetadata.cacheKey === cacheKey;
+): boolean => clientCacheMetadata.cacheKey === cacheKey;
+
+export const findExactClientCacheMetadata = (
+  clientCacheMetadataArr: ClientCacheMetadata[],
+  cacheKey: string
+): ClientCacheMetadata | null => {
+  if (!clientCacheMetadataArr) return null;
+
+  return (
+    clientCacheMetadataArr.find(metadata => metadata.cacheKey === cacheKey) ??
+    null
+  );
 };

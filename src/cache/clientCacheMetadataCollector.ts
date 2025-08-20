@@ -1,6 +1,5 @@
 import type { ClientCacheEntry, ClientCacheMetadata } from '@/types/cache';
-import { isCacheEntryExpired } from '@/utils/cacheUtils';
-import { isClientEnvironment } from '@/utils/environmentUtils';
+import { getTTLFromExpiresAt } from '@/utils/cacheUtils';
 
 const MAX_HEADER_SIZE = 8192;
 
@@ -21,7 +20,7 @@ const encodeForHeader = (data: string): string | null => {
 };
 
 const serializeClientCacheMetadata = (
-  metadata: ClientCacheMetadata
+  metadata: ClientCacheMetadata[]
 ): string | null => {
   try {
     return JSON.stringify(metadata);
@@ -31,55 +30,22 @@ const serializeClientCacheMetadata = (
   }
 };
 
-export const collectValidClientCacheMetadata = (
+export const collectClientCacheMetadata = (
   cacheKey: string,
   clientCacheEntry: ClientCacheEntry
-): ClientCacheMetadata | null => {
-  if (!isClientEnvironment() || isCacheEntryExpired(clientCacheEntry)) {
-    return null;
-  }
+): ClientCacheMetadata => {
+  const ttl = getTTLFromExpiresAt(clientCacheEntry.expiresAt);
 
   return {
-    cacheKey,
-    expiresAt: clientCacheEntry.expiresAt,
-    clientTags: clientCacheEntry.clientTags?.length
-      ? clientCacheEntry.clientTags
-      : undefined,
-    serverTags: clientCacheEntry.serverTags?.length
-      ? clientCacheEntry.serverTags
-      : undefined,
-    etag: clientCacheEntry.etag,
-    clientRevalidate: clientCacheEntry.clientRevalidate,
-  };
-};
-
-export const collectExpiredClientCacheMetadata = (
-  cacheKey: string,
-  clientCacheEntry: ClientCacheEntry
-): ClientCacheMetadata | null => {
-  if (
-    !isClientEnvironment() ||
-    !isCacheEntryExpired(clientCacheEntry) ||
-    !clientCacheEntry.etag
-  ) {
-    return null;
-  }
-
-  return {
+    ttl,
     cacheKey,
     etag: clientCacheEntry.etag,
-    expiresAt: clientCacheEntry.expiresAt,
-    clientRevalidate: clientCacheEntry.clientRevalidate,
   };
 };
 
 export const createClientCacheMetadataHeader = (
-  metadata?: ClientCacheMetadata
+  metadata: ClientCacheMetadata[]
 ): string | null => {
-  if (!metadata) {
-    return null;
-  }
-
   const serialized = serializeClientCacheMetadata(metadata);
 
   if (!serialized) {

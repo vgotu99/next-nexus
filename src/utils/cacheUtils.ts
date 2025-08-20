@@ -103,3 +103,11 @@ export const generateETag = (data: unknown): string => {
 
   return `W/"${Math.abs(hash).toString(36)}"`;
 };
+
+export const getTTLFromExpiresAt = (expiresAt: number): number => {
+  const now = getCurrentTimestamp();
+  const diffMs = expiresAt - now;
+  const diffSec = diffMs / 1000;
+
+  return diffSec > 0 ? Number(diffSec.toFixed(1)) : 0;
+};
