@@ -13,9 +13,6 @@ import {
   trackRequestStart,
   trackRequestSuccess,
 } from '@/debug/tracker';
-import { registerNotModifiedKey } from '@/scope/notModifiedContext';
-import { isDelegationEnabled } from '@/scope/renderRegistry';
-import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ServerCacheOptions } from '@/types/cache';
 import type { NextFetchDefinition } from '@/types/definition';
 import type {
@@ -171,6 +168,8 @@ const executeRequestWithLifecycle = async <T>(
         hasNoClientCache || (isClientCacheStale && !isETagMatched);
 
       if (shouldSkipHydration) {
+        const { registerNotModifiedKey } = await import('@/scope/notModifiedContext');
+
         registerNotModifiedKey(cacheKey);
 
         trackCache({
@@ -205,6 +204,8 @@ const executeRequestWithLifecycle = async <T>(
           etag: responseEtag,
           headers: cachedResponseHeaders,
         };
+
+        const { requestScopeStore } = await import('@/scope/requestScopeStore');
 
         await requestScopeStore.set(cacheKey, hydrationCacheEntry);
       }
@@ -359,6 +360,8 @@ export const nextFetch = async <T>(
       const exactClientCacheMetadata =
         clientCacheMetadataArr &&
         findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
+
+      const { isDelegationEnabled } = await import('@/scope/renderRegistry');
 
       const shouldDelegate =
         exactClientCacheMetadata !== null &&
