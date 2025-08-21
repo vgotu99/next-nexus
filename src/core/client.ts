@@ -1,11 +1,11 @@
 import { performance } from 'perf_hooks';
 
-import { requestCache } from '@/cache/requestCache';
+import { clientCacheStore } from '@/cache/clientCacheStore';
 import {
   extractClientCacheMetadataFromHeaders,
+  findExactClientCacheMetadata,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
-import { isClientETagMatched } from '@/cache/serverETagValidator';
 import { HEADERS } from '@/constants/cache';
 import {
   trackCache,
@@ -13,7 +13,10 @@ import {
   trackRequestStart,
   trackRequestSuccess,
 } from '@/debug/tracker';
-import type { ExtendTTLData, ServerCacheOptions } from '@/types/cache';
+import { registerNotModifiedKey } from '@/scope/notModifiedContext';
+import { isDelegationEnabled } from '@/scope/renderRegistry';
+import { requestScopeStore } from '@/scope/requestScopeStore';
+import type { ServerCacheOptions } from '@/types/cache';
 import type { NextFetchDefinition } from '@/types/definition';
 import type {
   InterceptorHandler,
@@ -29,11 +32,18 @@ import {
   applyRequestInterceptors,
   applyResponseInterceptors,
 } from '@/utils/applyInterceptor';
-import { generateCacheKey, generateETag } from '@/utils/cacheUtils';
-import { isServerEnvironment } from '@/utils/environmentUtils';
+import {
+  generateCacheKey,
+  generateCacheKeyFromDefinition,
+  generateETag,
+  isCacheEntryExpired,
+} from '@/utils/cacheUtils';
+import {
+  isServerEnvironment,
+  isClientEnvironment,
+} from '@/utils/environmentUtils';
 import { executeRequest } from '@/utils/executeRequest';
 import { retry } from '@/utils/retry';
-import { setupHeaders } from '@/utils/setupHeaders';
 
 import {
   createRequestInterceptor,
@@ -59,97 +69,16 @@ const transformServerOptionsToNextOptions = (
 const buildRequestConfig = (
   definition: NextFetchDefinition<unknown>
 ): InternalNextFetchRequestConfig => {
-  const {
-    method,
-    data,
-    client,
-    server,
-    headers: definitionHeaders,
-    ...restOptions
-  } = definition;
-
-  const headers = setupHeaders(definitionHeaders, {
-    [HEADERS.CLIENT_TAGS]: JSON.stringify(client?.tags || []),
-    [HEADERS.SERVER_TAGS]: JSON.stringify(server?.tags || []),
-  });
+  const { data, server, ...restOptions } = definition;
 
   const next = transformServerOptionsToNextOptions(server);
 
   return {
     ...restOptions,
-    method,
-    headers,
     next,
     body: data ? JSON.stringify(data) : undefined,
-    client,
     server,
   };
-};
-
-const createCachedResponse = <T>(
-  url: string,
-  config: InternalNextFetchRequestConfig
-): InternalNextFetchResponse<T | null> => {
-  const response = new Response(JSON.stringify(null), {
-    status: 204,
-    statusText: 'Client Cache Hit',
-    headers: { [HEADERS.CACHE_STATUS]: 'CLIENT_HIT' },
-  });
-
-  const cachedResponse: Omit<InternalNextFetchResponse<T | null>, 'clone'> = {
-    ...response,
-    ok: true,
-    redirected: false,
-    status: 204,
-    statusText: 'Client Cache Hit',
-    type: 'basic',
-    url,
-    data: null,
-    config,
-    request: new Request(url, config),
-    headers: new Headers(response.headers),
-    json: () => Promise.resolve(null),
-    text: () => Promise.resolve(JSON.stringify(null)),
-    blob: () => response.blob(),
-    arrayBuffer: () => response.arrayBuffer(),
-    formData: () => response.formData(),
-    body: null,
-    bodyUsed: true,
-  };
-
-  return {
-    ...cachedResponse,
-    clone: () => createCachedResponse(url, config),
-  };
-};
-
-const shouldSkipRequest = (
-  headers: Headers,
-  url: string,
-  method?: string,
-  clientTags?: string[],
-  serverTags?: string[]
-): boolean => {
-  if (method?.toUpperCase() !== 'GET') {
-    return false;
-  }
-
-  const validClientCache = extractClientCacheMetadataFromHeaders(
-    headers,
-    HEADERS.CLIENT_CACHE
-  );
-
-  if (!validClientCache) {
-    return false;
-  }
-
-  const cacheKey = generateCacheKey({
-    endpoint: url,
-    method,
-    clientTags,
-    serverTags,
-  });
-  return hasClientCacheEntryByCacheKey(validClientCache, cacheKey);
 };
 
 const createInterceptorInterface = (
@@ -176,18 +105,14 @@ const createInterceptorInterface = (
   },
 });
 
-const addResponseETagToResponseHeaders = <T>(
-  response: InternalNextFetchResponse<T | undefined>
-): InternalNextFetchResponse<T | undefined> => {
-  if (response.headers.get(HEADERS.RESPONSE_ETAG) || !response.data) {
-    return response;
+const getInboundHeaders = async () => {
+  try {
+    const { headers } = await import('next/headers');
+
+    return await headers();
+  } catch (error) {
+    return null;
   }
-
-  const etag = generateETag(response.data);
-
-  response.headers.set(HEADERS.RESPONSE_ETAG, etag);
-
-  return response;
 };
 
 const executeRequestWithLifecycle = async <T>(
@@ -206,35 +131,6 @@ const executeRequestWithLifecycle = async <T>(
     requestInterceptors
   );
 
-  const headers = new Headers(modifiedConfig.headers);
-  const expiredClientCacheMetadata = extractClientCacheMetadataFromHeaders(
-    headers,
-    HEADERS.REQUEST_ETAG
-  );
-
-  if (isServerEnvironment() && modifiedConfig.headers) {
-    if (
-      shouldSkipRequest(
-        headers,
-        url,
-        modifiedConfig.method,
-        modifiedConfig.client?.tags,
-        modifiedConfig.server?.tags
-      )
-    ) {
-      trackCache({
-        type: 'SKIP',
-        key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
-        source: 'server',
-        tags: modifiedConfig.client?.tags,
-        revalidate: modifiedConfig.client?.revalidate,
-        ttl: modifiedConfig.client?.revalidate || 0,
-      });
-
-      return createCachedResponse<T>(url, modifiedConfig);
-    }
-  }
-
   try {
     const response = await retry({
       attempt: ({ signal }) => {
@@ -247,99 +143,79 @@ const executeRequestWithLifecycle = async <T>(
       timeoutSeconds: modifiedConfig.timeout ?? 10,
     });
 
-    const responseWithETag = addResponseETagToResponseHeaders(response);
+    if (isServerEnvironment() && modifiedConfig.method === 'GET') {
+      const cacheKey = generateCacheKey({
+        url,
+        method: modifiedConfig.method,
+        clientTags: modifiedConfig.client?.tags,
+        serverTags: modifiedConfig.server?.tags,
+      });
 
-    const shouldSkipHydrationForThisKey =
-      isServerEnvironment() &&
-      responseWithETag.data &&
-      expiredClientCacheMetadata;
+      const inboundHeaders = await getInboundHeaders();
+      const responseEtag =
+        response.data !== null && generateETag(response.data);
 
-    if (shouldSkipHydrationForThisKey) {
-      const matched = isClientETagMatched(
-        responseWithETag.data,
-        expiredClientCacheMetadata
-      );
+      const clientCacheMetadataArr =
+        inboundHeaders && extractClientCacheMetadataFromHeaders(inboundHeaders);
+      const exactClientCacheMetadata =
+        clientCacheMetadataArr &&
+        findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
 
-      if (matched) {
-        const cacheKey = generateCacheKey({
-          endpoint: url,
-          method: modifiedConfig.method,
-          clientTags: modifiedConfig.client?.tags,
-          serverTags: modifiedConfig.server?.tags,
+      const hasNoClientCache = !exactClientCacheMetadata;
+      const isClientCacheStale = exactClientCacheMetadata?.ttl === 0;
+      const isETagMatched =
+        !!responseEtag && exactClientCacheMetadata?.etag === responseEtag;
+
+      const shouldSkipHydration = isClientCacheStale && isETagMatched;
+      const shouldHydrate =
+        hasNoClientCache || (isClientCacheStale && !isETagMatched);
+
+      if (shouldSkipHydration) {
+        registerNotModifiedKey(cacheKey);
+
+        trackCache({
+          type: 'MATCH',
+          key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+          source: 'server',
+          tags: modifiedConfig.client?.tags,
+          revalidate: modifiedConfig.client?.revalidate,
+          ttl: exactClientCacheMetadata.ttl,
         });
-
-        const current =
-          (await requestCache.get<ExtendTTLData>(
-            '__NEXT_FETCH_EXTEND_TTL__'
-          )) || {};
-        const prev = current[cacheKey] ?? 0;
-        current[cacheKey] = Math.max(
-          prev,
-          modifiedConfig.client?.revalidate || 0
-        );
-
-        await requestCache.set('__NEXT_FETCH_EXTEND_TTL__', current);
-
-        if (current[cacheKey] > 0) {
-          trackCache({
-            type: 'MATCH',
-            key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
-            source: 'server',
-            tags: modifiedConfig.client?.tags,
-            revalidate: modifiedConfig.client?.revalidate,
-            ttl: modifiedConfig.client?.revalidate || 0,
-          });
-        }
       }
-    }
 
-    if (
-      isServerEnvironment() &&
-      responseWithETag.data &&
-      !shouldSkipHydrationForThisKey
-    ) {
-      const etag = responseWithETag.headers.get(HEADERS.RESPONSE_ETAG);
-
-      const cachedResponseHeaders =
-        modifiedConfig.client?.cachedHeaders?.reduce<Record<string, string>>(
-          (acc, headerName) => {
-            const headerValue = responseWithETag.headers.get(headerName);
-            if (headerValue !== null) {
-              acc[headerName] = headerValue;
-            }
-            return acc;
-          },
-          {}
-        );
-
-      if (etag) {
-        const cacheKey = generateCacheKey({
-          endpoint: url,
-          method: config.method,
-          clientTags: config.client?.tags,
-          serverTags: config.server?.tags,
-        });
+      if (shouldHydrate) {
+        const cachedResponseHeaders =
+          modifiedConfig.client?.cachedHeaders?.reduce<Record<string, string>>(
+            (acc, headerName) => {
+              const headerValue = response.headers.get(headerName);
+              if (headerValue !== null) {
+                acc[headerName] = headerValue;
+              }
+              return acc;
+            },
+            {}
+          );
 
         const hydrationCacheEntry = {
-          data: responseWithETag.data,
+          data: response.data,
           key: cacheKey,
           clientRevalidate: modifiedConfig.client?.revalidate || 0,
           clientTags: modifiedConfig.client?.tags || [],
           serverTags: modifiedConfig.server?.tags || [],
-          etag,
+          etag: responseEtag,
           headers: cachedResponseHeaders,
         };
 
-        await requestCache.set(cacheKey, hydrationCacheEntry);
+        await requestScopeStore.set(cacheKey, hydrationCacheEntry);
       }
     }
 
     const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
-      ...responseWithETag,
+      ...response,
       config: modifiedConfig,
       request: new Request(url, modifiedConfig),
       clone: () => {
-        const clonedResponse = responseWithETag.clone();
+        const clonedResponse = response.clone();
         const clonedInternalResponse: InternalNextFetchResponse<T | undefined> =
           {
             ...clonedResponse,
@@ -359,7 +235,7 @@ const executeRequestWithLifecycle = async <T>(
 
     const duration = performance.now() - startTime;
 
-    if (isServerEnvironment()) {
+    if (isServerEnvironment() && modifiedConfig.method === 'GET') {
       const cacheStatus = response.headers.get('x-nextjs-cache');
       const ageHeader = response.headers.get('age');
       const age = ageHeader ? parseInt(ageHeader, 10) : undefined;
@@ -419,21 +295,101 @@ const executeRequestWithLifecycle = async <T>(
 const globalRequestInterceptor = createRequestInterceptor();
 const globalResponseInterceptor = createResponseInterceptor();
 
+const createResponseFromClientCache = <T>(
+  entry: { data: T },
+  url: string,
+  config: InternalNextFetchRequestConfig
+): NextFetchResponse<T> => {
+  const response = new Response(JSON.stringify(entry.data), {
+    status: 200,
+    statusText: 'OK',
+    headers: { [HEADERS.CACHE_STATUS]: 'CLIENT_HIT' },
+  });
+
+  return {
+    ...response,
+    ok: true,
+    redirected: false,
+    status: 200,
+    statusText: 'OK',
+    type: 'basic',
+    url,
+    data: entry.data,
+    config,
+    request: new Request(url, config),
+    headers: new Headers(response.headers),
+    json: () => Promise.resolve(entry.data),
+    text: () => Promise.resolve(JSON.stringify(entry.data)),
+    blob: () => response.blob(),
+    arrayBuffer: () => response.arrayBuffer(),
+    formData: () => response.formData(),
+    body: response.body,
+    bodyUsed: false,
+    clone: () => createResponseFromClientCache(entry, url, config),
+  } as NextFetchResponse<T>;
+};
+
 export const nextFetch = async <T>(
   definition: NextFetchDefinition<T>
 ): Promise<NextFetchResponse<T>> => {
-  const { baseURL, endpoint, interceptors } = definition;
+  const { baseURL, endpoint, interceptors, method } = definition;
   const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
 
+  const cacheKey =
+    method === 'GET' && generateCacheKeyFromDefinition(definition);
   const requestConfig = buildRequestConfig(definition);
 
-  return (await executeRequestWithLifecycle<T>(
+  if (isClientEnvironment() && cacheKey) {
+    const entry = clientCacheStore.get<T>(cacheKey);
+
+    if (entry && !isCacheEntryExpired(entry)) {
+      return Promise.resolve(
+        createResponseFromClientCache(entry, url, requestConfig)
+      );
+    }
+  }
+
+  if (isServerEnvironment() && cacheKey) {
+    const inboundHeaders = await getInboundHeaders();
+
+    if (inboundHeaders) {
+      const clientCacheMetadataArr =
+        extractClientCacheMetadataFromHeaders(inboundHeaders);
+
+      const exactClientCacheMetadata =
+        clientCacheMetadataArr &&
+        findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
+
+      const shouldDelegate =
+        exactClientCacheMetadata !== null &&
+        exactClientCacheMetadata?.ttl > 0 &&
+        isDelegationEnabled() &&
+        hasClientCacheEntryByCacheKey(exactClientCacheMetadata, cacheKey);
+
+      if (shouldDelegate) {
+        trackCache({
+          type: 'DELEGATE',
+          key: `${method?.toUpperCase() || 'GET'}: ${url}`,
+          source: 'server',
+          tags: definition.client?.tags,
+          revalidate: definition.client?.revalidate,
+          ttl: exactClientCacheMetadata.ttl,
+        });
+
+        throw new Promise(() => {});
+      }
+    }
+  }
+
+  const response = await executeRequestWithLifecycle<T>(
     url,
     requestConfig,
     interceptors || [],
     globalRequestInterceptor,
     globalResponseInterceptor
-  )) as NextFetchResponse<T>;
+  );
+
+  return response as NextFetchResponse<T>;
 };
 
 export const interceptors: NextFetchInterceptors = createInterceptorInterface(

@@ -16,9 +16,10 @@ export type CacheEventType =
   | 'MISS'
   | 'SKIP'
   | 'MATCH'
+  | 'DELEGATE'
   | 'SET'
   | 'UPDATE'
-  | 'DELETE'
+  | 'DELETE';
 
 export type CacheSource =
   | 'client-fetch'
