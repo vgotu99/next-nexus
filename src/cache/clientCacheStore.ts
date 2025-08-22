@@ -10,11 +10,6 @@ import {
 import { isClientEnvironment } from '@/utils/environmentUtils';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
 
-declare global {
-  interface Window {
-    __nextFetchClientCache?: typeof clientCacheStore;
-  }
-}
 
 const clientCacheState: ClientCacheState = {
   clientCache: new Map(),

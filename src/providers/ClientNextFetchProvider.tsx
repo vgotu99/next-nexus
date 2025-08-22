@@ -88,18 +88,12 @@ const logInitializationResult = (
   }
 };
 
-const setupDevelopmentDebug = (): void => {
-  if (isClientEnvironment() && isDevelopment()) {
-    window.__nextFetchClientCache = clientCacheStore;
-  }
-};
 
 export const initNextFetchClient = (): void => {
   try {
     const payload = getNextFetchPayload();
 
     if (!payload) {
-      setupDevelopmentDebug();
       return;
     }
 
@@ -108,7 +102,6 @@ export const initNextFetchClient = (): void => {
 
     logInitializationResult(hydratedCount, extendedCount);
     cleanupResources();
-    setupDevelopmentDebug();
   } catch (error) {
     console.error('[next-fetch] Client initialization failed:', error);
   }
