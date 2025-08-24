@@ -4,6 +4,7 @@ import {
   createRequestEvent,
 } from '@/debug/eventStream';
 import type { CacheEvent, RequestEvent } from '@/types/debug';
+import { extractBaseKeyFromCacheKey } from '@/utils/cacheUtils';
 import { isServerEnvironment } from '@/utils/environmentUtils';
 import { logger } from '@/utils/logger';
 import { msToSeconds } from '@/utils/timeUtils';
@@ -75,7 +76,7 @@ const logCacheEvent = (event: CacheEvent): void => {
   }
 
   const message = [
-    `[${sourceName}] [${type}] ${key}`,
+    `[${sourceName}] [${type}] ${extractBaseKeyFromCacheKey(key)}`,
     ...(details.length > 0 ? [details.join(' | ')] : []),
   ].join(' | ');
 

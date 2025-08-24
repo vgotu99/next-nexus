@@ -30,6 +30,7 @@ import {
   applyResponseInterceptors,
 } from '@/utils/applyInterceptor';
 import {
+  generateBaseKey,
   generateCacheKey,
   generateCacheKeyFromDefinition,
   generateETag,
@@ -168,13 +169,15 @@ const executeRequestWithLifecycle = async <T>(
         hasNoClientCache || (isClientCacheStale && !isETagMatched);
 
       if (shouldSkipHydration) {
-        const { registerNotModifiedKey } = await import('@/scope/notModifiedContext');
+        const { registerNotModifiedKey } = await import(
+          '@/scope/notModifiedContext'
+        );
 
         registerNotModifiedKey(cacheKey);
 
         trackCache({
           type: 'MATCH',
-          key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+          key: generateBaseKey({ url, method: modifiedConfig.method }),
           source: 'server',
           tags: modifiedConfig.client?.tags,
           revalidate: modifiedConfig.client?.revalidate,
@@ -245,7 +248,7 @@ const executeRequestWithLifecycle = async <T>(
       if (cacheStatus) {
         trackCache({
           type: cacheStatus as 'HIT' | 'MISS',
-          key: `${modifiedConfig.method?.toUpperCase() || 'GET'}: ${url}`,
+          key: generateBaseKey({ url, method: modifiedConfig.method }),
           source: 'server',
           duration: duration,
           status: finalResponse.status,
@@ -372,7 +375,7 @@ export const nextFetch = async <T>(
       if (shouldDelegate) {
         trackCache({
           type: 'DELEGATE',
-          key: `${method?.toUpperCase() || 'GET'}: ${url}`,
+          key: generateBaseKey({ url, method }),
           source: 'server',
           tags: definition.client?.tags,
           revalidate: definition.client?.revalidate,
