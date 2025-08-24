@@ -8,6 +8,7 @@ import NextFetchClientInitializer from '@/core/NextFetchClientInitializer';
 import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
 import type { NextFetchPayload } from '@/types/payload';
 import { isClientEnvironment, isDevelopment } from '@/utils/environmentUtils';
+import { logger } from '@/utils/logger';
 
 const getNextFetchPayload = (): NextFetchPayload | null => {
   if (!isClientEnvironment() || !window.__NEXT_FETCH_PAYLOAD__) {
@@ -17,7 +18,7 @@ const getNextFetchPayload = (): NextFetchPayload | null => {
   try {
     return window.__NEXT_FETCH_PAYLOAD__;
   } catch (error) {
-    console.warn('[next-fetch] Failed to parse payload:', error);
+    logger.warn('[Provider] Failed to parse hydration payload', error);
     return null;
   }
 };
@@ -54,7 +55,7 @@ const applyTTLExtensions = (notModifiedKeys: readonly string[]): number => {
 
       return false;
     } catch (error) {
-      console.warn(`[next-fetch] Failed to extend TTL for key ${key}:`, error);
+      logger.warn(`[Provider] Failed to extend TTL for key ${key}`, error);
       return false;
     }
   }).length;
@@ -69,7 +70,7 @@ const cleanupResources = (): void => {
     const scriptElement = document.getElementById('__NEXT_FETCH_SCRIPT__');
     scriptElement?.remove();
   } catch (error) {
-    console.warn('[next-fetch] Failed to cleanup resources:', error);
+    logger.warn('[Provider] Failed to cleanup resources', error);
   }
 };
 
@@ -82,9 +83,7 @@ const logInitializationResult = (
   const totalOperations = hydratedCount + extendedCount;
 
   if (totalOperations > 0) {
-    console.log(
-      `[next-fetch] Initialized - Hydrated: ${hydratedCount}, Extended: ${extendedCount}`
-    );
+    logger.info(`[Provider] Initialized - Hydrated: ${hydratedCount}, Extended: ${extendedCount}`);
   }
 };
 
@@ -103,7 +102,7 @@ export const initNextFetchClient = (): void => {
     logInitializationResult(hydratedCount, extendedCount);
     cleanupResources();
   } catch (error) {
-    console.error('[next-fetch] Client initialization failed:', error);
+    logger.error('[Provider] Client initialization failed', error);
   }
 };
 

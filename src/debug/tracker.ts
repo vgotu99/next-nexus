@@ -79,7 +79,7 @@ const logCacheEvent = (event: CacheEvent): void => {
     ...(details.length > 0 ? [details.join(' | ')] : []),
   ].join(' | ');
 
-  logger.debug('Cache', message);
+  logger.debug(`[Cache] ${message}`);
 };
 
 const logRequestEvent = (event: RequestEvent): void => {
@@ -94,15 +94,15 @@ const logRequestEvent = (event: RequestEvent): void => {
   }
 
   if (status !== undefined) {
-    details.push(`status: ${status})}`);
+    details.push(`status: ${status}`);
   }
 
   if (error !== undefined) {
-    details.push(`error: ${error})}`);
+    details.push(`error: ${error}`);
   }
 
   if (responseSize !== undefined) {
-    details.push(`responseSize: ${responseSize})}`);
+    details.push(`responseSize: ${responseSize}`);
   }
 
   const message = [
@@ -110,7 +110,7 @@ const logRequestEvent = (event: RequestEvent): void => {
     ...(details.length > 0 ? [details.join(' | ')] : []),
   ].join(' | ');
 
-  logger.debug('Request', message);
+  logger.info(`[Request] ${message}`);
 };
 
 cacheEventStream.subscribe(logCacheEvent);

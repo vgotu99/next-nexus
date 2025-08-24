@@ -1,5 +1,4 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import type { CacheHandler } from '@/types/cache';
 import type { NextFetchDefinition } from '@/types/definition';
 import {
@@ -7,15 +6,13 @@ import {
   isCacheEntryExpired,
 } from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
+import { logger } from '@/utils/logger';
 
 const validateGetDefinition = (
   definition: NextFetchDefinition<unknown>
 ): void => {
   if (!isGetDefinition(definition)) {
-    console.warn(
-      `${ERROR_MESSAGE_PREFIX} clientCache is primarily designed for GET requests. ` +
-        'Using it with mutation definitions may not work as expected.'
-    );
+    logger.warn('[Cache] clientCache is primarily designed for GET requests. Using it with mutation definitions may not work as expected.');
   }
 };
 

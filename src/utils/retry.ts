@@ -1,5 +1,6 @@
 import { ERROR_CODES } from '@/constants/errorCodes';
 import { isNextFetchError } from '@/errors/errorFactory';
+import { logger } from '@/utils/logger';
 
 import { setupTimeout } from './setupTimeout';
 import { secondsToMs } from './timeUtils';
@@ -9,7 +10,7 @@ interface RetryConfig<T> {
   maxAttempts: number;
   delaySeconds: number;
   timeoutSeconds: number;
-};
+}
 
 const shouldRetry = (error: unknown): boolean => {
   if (!isNextFetchError(error)) return true;
@@ -41,7 +42,7 @@ export const retry = async <T>({
     try {
       const result = await attempt({ signal: abortController.signal });
       clearTimeout(timeoutId);
-      
+
       return result;
     } catch (error) {
       clearTimeout(timeoutId);
@@ -50,8 +51,8 @@ export const retry = async <T>({
         throw error;
       }
 
-      console.warn(
-        `[next-fetch] Request failed. Retrying (${attemptIndex + 1}/${maxAttempts - 1})...`
+      logger.warn(
+        `[Request] Request failed. Retrying (${attemptIndex + 1}/${maxAttempts - 1})...`
       );
 
       await sleep(secondsToMs(delaySeconds));

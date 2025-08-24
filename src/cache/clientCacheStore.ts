@@ -8,8 +8,8 @@ import {
   normalizeCacheTags,
 } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
+import { logger } from '@/utils/logger';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
-
 
 const clientCacheState: ClientCacheState = {
   clientCache: new Map(),
@@ -31,7 +31,10 @@ const notify = (cacheKey: string, entry: ClientCacheEntry | null): void => {
     try {
       callback(entry);
     } catch (error) {
-      console.error(`${ERROR_MESSAGE_PREFIX} Error in cache listener:`, error);
+      logger.error(
+        `[Core] ${ERROR_MESSAGE_PREFIX} Error in cache listener:`,
+        error
+      );
     }
   });
 };

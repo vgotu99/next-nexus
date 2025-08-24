@@ -4,6 +4,7 @@ import type {
   RequestEvent,
   Unsubscribe,
 } from '@/types/debug';
+import { logger } from '@/utils/logger';
 import { getCurrentTimestamp } from '@/utils/timeUtils';
 
 export const createEventStream = <T>(): EventStream<T> => {
@@ -22,7 +23,7 @@ export const createEventStream = <T>(): EventStream<T> => {
       try {
         handler(event);
       } catch (error) {
-        console.error('Event handler error:', error);
+        logger.error('[Cache] Event handler error', error);
       }
     });
   };

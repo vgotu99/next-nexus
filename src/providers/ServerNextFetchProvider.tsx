@@ -6,6 +6,7 @@ import {
 import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ClientCacheEntry } from '@/types/cache';
 import { NextFetchPayload } from '@/types/payload';
+import { logger } from '@/utils/logger';
 
 type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'maxSize'>;
 
@@ -77,7 +78,7 @@ export const HydrationScript = async () => {
       />
     );
   } catch (error) {
-    console.warn('[next-fetch] Failed to generate hydration script:', error);
+    logger.warn('[Provider] Failed to generate hydration script', error);
     return null;
   }
 };

@@ -1,12 +1,13 @@
 import { HEADERS } from '@/constants/cache';
 import type { ClientCacheMetadata } from '@/types/cache';
 import { isServerEnvironment } from '@/utils/environmentUtils';
+import { logger } from '@/utils/logger';
 
 const decodeFromHeader = (encodedData: string): string | null => {
   try {
     return atob(encodedData);
   } catch (error) {
-    console.warn('Failed to decode client cache metadata header:', error);
+    logger.warn('[Cache] Failed to decode client cache metadata header', error);
     return null;
   }
 };
@@ -17,7 +18,7 @@ const parseClientCacheMetadata = (
   try {
     return JSON.parse(serializedData);
   } catch (error) {
-    console.warn('Failed to parse client cache metadata:', error);
+    logger.warn('[Cache] Failed to parse client cache metadata', error);
     return null;
   }
 };

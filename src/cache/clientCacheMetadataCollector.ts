@@ -1,20 +1,19 @@
 import type { ClientCacheEntry, ClientCacheMetadata } from '@/types/cache';
 import { getTTLFromExpiresAt } from '@/utils/cacheUtils';
+import { logger } from '@/utils/logger';
 
 const MAX_HEADER_SIZE = 8192;
 
 const encodeForHeader = (data: string): string | null => {
   try {
     if (data.length > MAX_HEADER_SIZE) {
-      console.warn(
-        `Client cache metadata exceeds header size limit (${data.length} > ${MAX_HEADER_SIZE}). Truncating...`
-      );
+      logger.warn(`[Cache] Client cache metadata exceeds header size limit (${data.length} > ${MAX_HEADER_SIZE}). Truncating...`);
       return btoa(data.substring(0, MAX_HEADER_SIZE - 100));
     }
 
     return btoa(data);
   } catch (error) {
-    console.warn('Failed to encode client cache metadata for header:', error);
+    logger.warn('[Cache] Failed to encode client cache metadata for header', error);
     return null;
   }
 };
@@ -25,7 +24,7 @@ const serializeClientCacheMetadata = (
   try {
     return JSON.stringify(metadata);
   } catch (error) {
-    console.warn('Failed to serialize client cache metadata:', error);
+    logger.warn('[Cache] Failed to serialize client cache metadata', error);
     return null;
   }
 };
