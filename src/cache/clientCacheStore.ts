@@ -1,5 +1,4 @@
 import { DEFAULT_CLIENT_CACHE_MAX_SIZE } from '@/constants/cache';
-import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import { trackCache } from '@/debug/tracker';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
@@ -32,7 +31,7 @@ const notify = (cacheKey: string, entry: ClientCacheEntry | null): void => {
       callback(entry);
     } catch (error) {
       logger.error(
-        `[Core] ${ERROR_MESSAGE_PREFIX} Error in cache listener:`,
+        `[Core] Error in cache listener:`,
         error
       );
     }

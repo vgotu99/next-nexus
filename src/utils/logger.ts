@@ -1,4 +1,3 @@
-import { ERROR_MESSAGE_PREFIX } from '@/constants/errorMessages';
 import { getDebugConfig } from '@/debug/config';
 import { isDevelopment } from '@/utils/environmentUtils';
 
@@ -11,8 +10,7 @@ const sink = {
   error: console.error,
 } as const;
 
-const format = (message: string): string =>
-  `${ERROR_MESSAGE_PREFIX} ${message}`;
+const format = (message: string): string => `[Nexus] ${message}`;
 
 const log =
   (level: 'debug' | 'info' | 'warn' | 'error') =>

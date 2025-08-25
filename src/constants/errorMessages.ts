@@ -1,7 +1,5 @@
 import type { ErrorCode, ErrorMessageTemplate } from '@/types/error';
 
-export const ERROR_MESSAGE_PREFIX = '[nexus]';
-
 export const ERROR_MESSAGES: Record<ErrorCode, ErrorMessageTemplate> = {
   NETWORK_ERROR: {
     message: (details: string) => `Network request failed: ${details}`,
