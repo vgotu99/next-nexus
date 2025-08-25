@@ -10,16 +10,11 @@ import { logger } from '@/utils/logger';
 
 type ServerNexusProviderProps = Omit<NexusProviderProps, 'maxSize'>;
 
-const collectHydrationData = async (notModifiedKeys: readonly string[]) => {
+const collectHydrationData = async () => {
   const allCacheKeys = await requestScopeStore.keys();
-  const notModifiedSet = new Set(notModifiedKeys);
-
-  const hydrationCandidateKeys = allCacheKeys.filter(
-    key => !notModifiedSet.has(key) && !key.startsWith('__NEXT_FETCH_')
-  );
 
   const hydrationEntries = await Promise.all(
-    hydrationCandidateKeys.map(async key => {
+    allCacheKeys.map(async key => {
       const entry = await requestScopeStore.get<ClientCacheEntry>(key);
 
       if (!entry) return null;
@@ -56,7 +51,7 @@ export const HydrationScript = async () => {
   try {
     const notModifiedKeys = getNotModifiedKeys();
 
-    const hydrationData = await collectHydrationData(notModifiedKeys);
+    const hydrationData = await collectHydrationData();
 
     const payload: NexusPayload = {
       hydrationData,

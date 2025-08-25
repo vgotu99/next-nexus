@@ -168,21 +168,27 @@ const executeRequestWithLifecycle = async <T>(
       const shouldHydrate =
         hasNoClientCache || (isClientCacheStale && !isETagMatched);
 
+      const { requestScopeStore } = await import('@/scope/requestScopeStore');
+
       if (shouldSkipHydration) {
-        const { registerNotModifiedKey } = await import(
-          '@/scope/notModifiedContext'
-        );
+        const existing = await requestScopeStore.get(cacheKey);
 
-        registerNotModifiedKey(cacheKey);
+        if (!existing) {
+          const { registerNotModifiedKey } = await import(
+            '@/scope/notModifiedContext'
+          );
 
-        trackCache({
-          type: 'MATCH',
-          key: generateBaseKey({ url, method: modifiedConfig.method }),
-          source: 'server',
-          tags: modifiedConfig.client?.tags,
-          revalidate: modifiedConfig.client?.revalidate,
-          ttl: exactClientCacheMetadata.ttl,
-        });
+          registerNotModifiedKey(cacheKey);
+
+          trackCache({
+            type: 'MATCH',
+            key: generateBaseKey({ url, method: modifiedConfig.method }),
+            source: 'server',
+            tags: modifiedConfig.client?.tags,
+            revalidate: modifiedConfig.client?.revalidate,
+            ttl: exactClientCacheMetadata.ttl,
+          });
+        }
       }
 
       if (shouldHydrate) {
@@ -207,8 +213,6 @@ const executeRequestWithLifecycle = async <T>(
           etag: responseEtag,
           headers: cachedResponseHeaders,
         };
-
-        const { requestScopeStore } = await import('@/scope/requestScopeStore');
 
         await requestScopeStore.set(cacheKey, hydrationCacheEntry);
       }
