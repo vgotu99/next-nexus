@@ -10,6 +10,7 @@ interface RetryConfig<T> {
   maxAttempts: number;
   delaySeconds: number;
   timeoutSeconds: number;
+  context: { url: string; method: string };
 }
 
 const shouldRetry = (error: unknown): boolean => {
@@ -31,6 +32,7 @@ export const retry = async <T>({
   maxAttempts,
   delaySeconds,
   timeoutSeconds,
+  context,
 }: RetryConfig<T>): Promise<T> => {
   const attemptWithRetry = async (attemptIndex: number): Promise<T> => {
     const abortController = new AbortController();
@@ -51,8 +53,10 @@ export const retry = async <T>({
         throw error;
       }
 
-      logger.warn(
-        `[Request] Request failed. Retrying (${attemptIndex + 1}/${maxAttempts - 1})...`
+      logger.debug(
+        context
+          ? `[Request] ${context.method}: ${context.url} failed. Retrying (${attemptIndex + 1}/${maxAttempts - 1})...`
+          : `[Request] Request failed. Retrying (${attemptIndex + 1}/${maxAttempts - 1})...`
       );
 
       await sleep(secondsToMs(delaySeconds));

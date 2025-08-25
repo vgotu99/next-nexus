@@ -7,12 +7,15 @@ import {
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
 import { HEADERS } from '@/constants/cache';
+import { ERROR_CODES } from '@/constants/errorCodes';
 import {
   trackCache,
   trackRequestError,
   trackRequestStart,
   trackRequestSuccess,
+  trackRequestTimeout,
 } from '@/debug/tracker';
+import { isNexusError } from '@/errors/errorFactory';
 import type { ServerCacheOptions } from '@/types/cache';
 import type { NexusDefinition } from '@/types/definition';
 import type {
@@ -139,6 +142,7 @@ const executeRequestWithLifecycle = async <T>(
       maxAttempts: (modifiedConfig.retry?.count ?? 0) + 1,
       delaySeconds: modifiedConfig.retry?.delay ?? 1,
       timeoutSeconds: modifiedConfig.timeout ?? 10,
+      context: { url, method: modifiedConfig.method || 'GET' },
     });
 
     if (isServerEnvironment() && modifiedConfig.method === 'GET') {
@@ -290,13 +294,20 @@ const executeRequestWithLifecycle = async <T>(
     return finalResponse;
   } catch (error) {
     const duration = performance.now() - startTime;
-    trackRequestError({
-      url,
-      method: config.method || 'GET',
-      duration,
-      error:
-        error instanceof Error ? error.message : 'Unknown error after retries',
-    });
+
+    if (isNexusError(error) && error.code === ERROR_CODES.TIMEOUT_ERROR) {
+      trackRequestTimeout({ url, method: config.method || 'GET', duration });
+    } else {
+      trackRequestError({
+        url,
+        method: config.method || 'GET',
+        duration,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Unknown error after retries',
+      });
+    }
     throw error;
   }
 };

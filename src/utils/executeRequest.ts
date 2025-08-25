@@ -1,4 +1,3 @@
-import { trackRequestError, trackRequestTimeout } from '@/debug/tracker';
 import { isNexusError } from '@/errors/errorFactory';
 import type { InternalNexusResponse } from '@/types/internal';
 
@@ -24,8 +23,6 @@ const handleErrorResponse = async (
 export const executeRequest = async <T>(
   request: Request
 ): Promise<InternalNexusResponse<T | undefined>> => {
-  const startTime = performance.now();
-
   try {
     validateUrl(request.url);
 
@@ -37,23 +34,6 @@ export const executeRequest = async <T>(
 
     return processResponse<T>(response, request.method);
   } catch (error) {
-    const duration = performance.now() - startTime;
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      trackRequestTimeout({
-        url: request.url,
-        method: request.method,
-        duration,
-      });
-    } else {
-      trackRequestError({
-        url: request.url,
-        method: request.method,
-        duration,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
     if (isNexusError(error)) {
       throw error;
     }
