@@ -3,13 +3,9 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { HEADERS } from '@/constants/cache';
 import { nexus } from '@/core/client';
 import type { ClientCacheEntry } from '@/types/cache';
-import type {
-  GetNexusDefinition,
-  NexusDefinition,
-} from '@/types/definition';
+import type { GetNexusDefinition, NexusDefinition } from '@/types/definition';
 import type {
   NexusQueryState,
   UseNexusQueryOptions,
@@ -18,6 +14,7 @@ import type {
 import {
   generateCacheKeyFromDefinition,
   isCacheEntryExpired,
+  generateETag,
 } from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
 
@@ -84,7 +81,10 @@ const fetchData = async <TData>(
 
   const response = await nexus(finalDefinition);
 
-  const etag = response.headers.get(HEADERS.RESPONSE_ETAG) || undefined;
+  const etag =
+    response.data !== null && response.data !== undefined
+      ? generateETag(response.data)
+      : undefined;
 
   const cachedResponseHeaders = definition.client?.cachedHeaders?.reduce<
     Record<string, string>

@@ -151,7 +151,9 @@ const executeRequestWithLifecycle = async <T>(
 
       const inboundHeaders = await getInboundHeaders();
       const responseEtag =
-        response.data !== null && generateETag(response.data);
+        response.data !== null && response.data !== undefined
+          ? generateETag(response.data)
+          : undefined;
 
       const clientCacheMetadataArr =
         inboundHeaders && extractClientCacheMetadataFromHeaders(inboundHeaders);
