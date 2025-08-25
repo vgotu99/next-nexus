@@ -9,30 +9,30 @@ import { isServerEnvironment } from '@/utils/environmentUtils';
 import { logger } from '@/utils/logger';
 import { msToSeconds } from '@/utils/timeUtils';
 
-interface PublishRequestStartParams {
+interface PublishRequestStart {
   url: string;
   method: string;
 }
 
-interface PublishRequestSuccessParams {
+interface PublishRequestSuccess {
   url: string;
   method: string;
-  duration: number;
+  startTime: number;
   status: number;
   responseSize?: number;
 }
 
-interface PublishRequestErrorParams {
+interface PublishRequestError {
   url: string;
   method: string;
-  duration: number;
+  startTime: number;
   error: string;
 }
 
-interface PublishRequestTimeoutParams {
+interface PublishRequestTimeout {
   url: string;
   method: string;
-  duration: number;
+  startTime: number;
 }
 
 const cacheEventStream = createEventStream<CacheEvent>();
@@ -122,45 +122,65 @@ const publishCacheEvent = (eventData: Omit<CacheEvent, 'timestamp'>): void => {
   cacheEventStream.publish(event);
 };
 
-const publishRequestStart = (params: PublishRequestStartParams): string => {
+const publishRequestStart = ({ url, method }: PublishRequestStart): number => {
   const event = createRequestEvent({
     type: 'START',
-    url: params.url,
-    method: params.method,
+    url,
+    method,
   });
   requestEventStream.publish(event);
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  return performance.now();
 };
 
-const publishRequestSuccess = (params: PublishRequestSuccessParams): void => {
+performance
+
+const publishRequestSuccess = ({
+  url,
+  method,
+  startTime,
+  status,
+  responseSize,
+}: PublishRequestSuccess): void => {
+  const duration = performance.now() - startTime;
   const event = createRequestEvent({
     type: 'SUCCESS',
-    url: params.url,
-    method: params.method,
-    duration: params.duration,
-    status: params.status,
-    responseSize: params.responseSize,
+    url,
+    method,
+    duration,
+    status,
+    responseSize,
   });
   requestEventStream.publish(event);
 };
 
-const publishRequestError = (params: PublishRequestErrorParams): void => {
+const publishRequestError = ({
+  url,
+  method,
+  startTime,
+  error,
+}: PublishRequestError): void => {
+  const duration = performance.now() - startTime;
   const event = createRequestEvent({
     type: 'ERROR',
-    url: params.url,
-    method: params.method,
-    duration: params.duration,
-    error: params.error,
+    url,
+    method,
+    duration,
+    error,
   });
   requestEventStream.publish(event);
 };
 
-const publishRequestTimeout = (params: PublishRequestTimeoutParams): void => {
+const publishRequestTimeout = ({
+  url,
+  method,
+  startTime,
+}: PublishRequestTimeout): void => {
+  const duration = performance.now() - startTime;
   const event = createRequestEvent({
     type: 'TIMEOUT',
-    url: params.url,
-    method: params.method,
-    duration: params.duration,
+    url,
+    method,
+    duration,
   });
   requestEventStream.publish(event);
 };

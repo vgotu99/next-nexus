@@ -1,5 +1,3 @@
-import { performance } from 'perf_hooks';
-
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import {
   extractClientCacheMetadataFromHeaders,
@@ -123,8 +121,7 @@ const executeRequestWithLifecycle = async <T>(
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
 ): Promise<InternalNexusResponse<T | null | undefined>> => {
-  const startTime = performance.now();
-  trackRequestStart({ url, method: config.method || 'GET' });
+  const startTime = trackRequestStart({ url, method: config.method || 'GET' });
 
   const requestInterceptors = requestInterceptor.getByNames(interceptors);
   const modifiedConfig = await applyRequestInterceptors(
@@ -278,7 +275,7 @@ const executeRequestWithLifecycle = async <T>(
       trackRequestSuccess({
         url,
         method: config.method || 'GET',
-        duration,
+        startTime,
         status: finalResponse.status,
         responseSize,
       });
@@ -286,22 +283,20 @@ const executeRequestWithLifecycle = async <T>(
       trackRequestError({
         url,
         method: config.method || 'GET',
-        duration,
+        startTime,
         error: `HTTP ${finalResponse.status}`,
       });
     }
 
     return finalResponse;
   } catch (error) {
-    const duration = performance.now() - startTime;
-
     if (isNexusError(error) && error.code === ERROR_CODES.TIMEOUT_ERROR) {
-      trackRequestTimeout({ url, method: config.method || 'GET', duration });
+      trackRequestTimeout({ url, method: config.method || 'GET', startTime });
     } else {
       trackRequestError({
         url,
         method: config.method || 'GET',
-        duration,
+        startTime,
         error:
           error instanceof Error
             ? error.message
