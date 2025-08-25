@@ -4,16 +4,16 @@ import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import { HEADERS } from '@/constants/cache';
-import { nextFetch } from '@/core/client';
+import { nexus } from '@/core/client';
 import type { ClientCacheEntry } from '@/types/cache';
 import type {
-  GetNextFetchDefinition,
-  NextFetchDefinition,
+  GetNexusDefinition,
+  NexusDefinition,
 } from '@/types/definition';
 import type {
-  NextQueryState,
-  UseNextQueryOptions,
-  UseNextQueryResult,
+  NexusQueryState,
+  UseNexusQueryOptions,
+  UseNexusQueryResult,
 } from '@/types/hooks';
 import {
   generateCacheKeyFromDefinition,
@@ -28,9 +28,9 @@ type QueryAction<TData> =
   | { type: 'RESET' };
 
 const queryReducer = <TData>(
-  state: NextQueryState<TData>,
+  state: NexusQueryState<TData>,
   action: QueryAction<TData>
-): NextQueryState<TData> => {
+): NexusQueryState<TData> => {
   switch (action.type) {
     case 'SET_RESULT':
       return {
@@ -74,7 +74,7 @@ const queryReducer = <TData>(
 };
 
 const fetchData = async <TData>(
-  definition: GetNextFetchDefinition<TData>,
+  definition: GetNexusDefinition<TData>,
   cacheKey: string,
   route?: string
 ): Promise<{ data: TData; headers: Headers }> => {
@@ -82,7 +82,7 @@ const fetchData = async <TData>(
     ? { ...definition, baseURL: '', endpoint: route }
     : definition;
 
-  const response = await nextFetch(finalDefinition);
+  const response = await nexus(finalDefinition);
 
   const etag = response.headers.get(HEADERS.RESPONSE_ETAG) || undefined;
 
@@ -109,19 +109,19 @@ const fetchData = async <TData>(
   return { data: response.data, headers: response.headers };
 };
 
-export const useNextQuery = <TData = unknown, TSelectedData = TData>(
-  definition: NextFetchDefinition<TData>,
-  options: UseNextQueryOptions<TData, TSelectedData> = {}
-): UseNextQueryResult<TSelectedData> => {
+export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
+  definition: NexusDefinition<TData>,
+  options: UseNexusQueryOptions<TData, TSelectedData> = {}
+): UseNexusQueryResult<TSelectedData> => {
   if (!definition) {
-    throw new Error('useNextQuery: definition is required');
+    throw new Error('useNexusQuery: definition is required');
   }
   if (!isGetDefinition(definition)) {
-    throw new Error('useNextQuery only accepts GET definitions');
+    throw new Error('useNexusQuery only accepts GET definitions');
   }
   if (typeof definition.endpoint !== 'string' || !definition.endpoint) {
     throw new Error(
-      'useNextQuery: definition.endpoint must be a non-empty string'
+      'useNexusQuery: definition.endpoint must be a non-empty string'
     );
   }
 
@@ -161,7 +161,7 @@ export const useNextQuery = <TData = unknown, TSelectedData = TData>(
 
       dispatch({
         type: 'SET_ERROR',
-        payload: new Error(`useNextQuery failed: ${errorMessage}`),
+        payload: new Error(`useNexusQuery failed: ${errorMessage}`),
       });
     }
   }, [definition, cacheKey, enabled, route]);

@@ -1,8 +1,8 @@
-import type { NextFetchPayload } from './payload';
+import type { NexusPayload } from './payload';
 
 declare global {
   interface Window {
-    __NEXT_FETCH_PAYLOAD__?: NextFetchPayload;
+    __NEXUS_PAYLOAD__?: NexusPayload;
   }
 }
 

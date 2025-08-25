@@ -3,8 +3,8 @@ import { ERROR_MESSAGES } from '@/constants/errorMessages';
 import type {
   ErrorCode,
   ErrorMessageTemplate,
-  NextFetchErrorData,
-  NextFetchErrorInfo,
+  NexusErrorData,
+  NexusErrorInfo,
 } from '@/types/error';
 
 const ERROR_MESSAGE_KEYWORDS = {
@@ -72,17 +72,17 @@ export const getErrorMessageByStatus = (status: number): string => {
 };
 
 export const hasErrorCode = (
-  error: NextFetchErrorInfo,
+  error: NexusErrorInfo,
   code: ErrorCode
 ): boolean => error.code === code;
 
-const ERROR_MESSAGE_KEYS_PRIORITY: Array<keyof NextFetchErrorData> = [
+const ERROR_MESSAGE_KEYS_PRIORITY: Array<keyof NexusErrorData> = [
   'message',
   'error',
   'detail',
 ];
 
-export const extractErrorMessage = (data: NextFetchErrorData): string => {
+export const extractErrorMessage = (data: NexusErrorData): string => {
   if (typeof data === 'string') return data;
   if (!data || typeof data !== 'object') return 'Unknown error occurred';
 

@@ -1,14 +1,14 @@
-import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
+import type { NexusProviderProps } from '@/providers/NexusProvider';
 import {
   getNotModifiedKeys,
   runWithNotModifiedContext,
 } from '@/scope/notModifiedContext';
 import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ClientCacheEntry } from '@/types/cache';
-import { NextFetchPayload } from '@/types/payload';
+import { NexusPayload } from '@/types/payload';
 import { logger } from '@/utils/logger';
 
-type ServerNextFetchProviderProps = Omit<NextFetchProviderProps, 'maxSize'>;
+type ServerNexusProviderProps = Omit<NexusProviderProps, 'maxSize'>;
 
 const collectHydrationData = async (notModifiedKeys: readonly string[]) => {
   const allCacheKeys = await requestScopeStore.keys();
@@ -45,7 +45,7 @@ const collectHydrationData = async (notModifiedKeys: readonly string[]) => {
   return Object.fromEntries(validEntries);
 };
 
-const hasPayloadContent = (payload: NextFetchPayload): boolean => {
+const hasPayloadContent = (payload: NexusPayload): boolean => {
   return (
     Object.keys(payload.hydrationData).length > 0 ||
     payload.notModifiedKeys.length > 0
@@ -58,7 +58,7 @@ export const HydrationScript = async () => {
 
     const hydrationData = await collectHydrationData(notModifiedKeys);
 
-    const payload: NextFetchPayload = {
+    const payload: NexusPayload = {
       hydrationData,
       notModifiedKeys,
     };
@@ -71,9 +71,9 @@ export const HydrationScript = async () => {
 
     return (
       <script
-        id='__NEXT_FETCH_SCRIPT__'
+        id='__NEXUS_SCRIPT__'
         dangerouslySetInnerHTML={{
-          __html: `window.__NEXT_FETCH_PAYLOAD__ = ${serializedPayload};`,
+          __html: `window.__NEXUS_PAYLOAD__ = ${serializedPayload};`,
         }}
       />
     );
@@ -83,9 +83,7 @@ export const HydrationScript = async () => {
   }
 };
 
-const ServerNextFetchProvider = ({
-  children,
-}: ServerNextFetchProviderProps) => {
+const ServerNexusProvider = ({ children }: ServerNexusProviderProps) => {
   return requestScopeStore.runWith(() =>
     runWithNotModifiedContext(() => (
       <>
@@ -96,4 +94,4 @@ const ServerNextFetchProvider = ({
   );
 };
 
-export default ServerNextFetchProvider;
+export default ServerNexusProvider;

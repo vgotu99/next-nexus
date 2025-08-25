@@ -5,7 +5,7 @@ interface RetryOptions {
   delay?: number;
 }
 
-export interface NextFetchRequestConfig extends RequestInit, CacheOptions {
+export interface NexusRequestConfig extends RequestInit, CacheOptions {
   baseURL?: string;
   interceptors?: string[];
   timeout?: number;

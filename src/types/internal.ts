@@ -1,20 +1,18 @@
-import { NextFetchRequestConfig } from "@/types/request";
-import { NextFetchResponse } from "@/types/response";
+import { NexusRequestConfig } from '@/types/request';
+import { NexusResponse } from '@/types/response';
 
-
-export interface InternalNextFetchRequestConfig extends NextFetchRequestConfig {
+export interface InternalNexusRequestConfig extends NexusRequestConfig {
   timeoutId?: NodeJS.Timeout;
-  next?: NextOptions;
+  next?: NexusOptions;
 }
 
-export interface InternalNextFetchResponse<T = unknown>
-  extends NextFetchResponse<T> {
-  config?: InternalNextFetchRequestConfig;
+export interface InternalNexusResponse<T = unknown> extends NexusResponse<T> {
+  config?: InternalNexusRequestConfig;
   request?: Request;
-  clone(): InternalNextFetchResponse<T>;
+  clone(): InternalNexusResponse<T>;
 }
 
-export interface NextOptions {
+export interface NexusOptions {
   revalidate?: number | false;
   tags?: string[];
 }

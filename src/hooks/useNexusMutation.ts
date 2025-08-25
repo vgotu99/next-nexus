@@ -2,12 +2,12 @@
 
 import { useCallback, useReducer } from 'react';
 
-import { nextFetch } from '@/core/client';
-import type { NextFetchDefinition } from '@/types/definition';
+import { nexus } from '@/core/client';
+import type { NexusDefinition } from '@/types/definition';
 import type {
-  NextMutationState,
-  UseNextMutationOptions,
-  UseNextMutationResult,
+  NexusMutationState,
+  UseNexusMutationOptions,
+  UseNexusMutationResult,
 } from '@/types/hooks';
 import { isMutationDefinition } from '@/utils/definitionUtils';
 
@@ -18,9 +18,9 @@ type MutationAction<TData, TError> =
   | { type: 'RESET' };
 
 const mutationReducer = <TData, TError>(
-  state: NextMutationState<TData, TError>,
+  state: NexusMutationState<TData, TError>,
   action: MutationAction<TData, TError>
-): NextMutationState<TData, TError> => {
+): NexusMutationState<TData, TError> => {
   switch (action.type) {
     case 'SET_PENDING':
       return {
@@ -63,7 +63,7 @@ const mutationReducer = <TData, TError>(
   }
 };
 
-export const useNextMutation = <
+export const useNexusMutation = <
   TContext = unknown,
   TError = Error,
   TData = unknown,
@@ -71,14 +71,14 @@ export const useNextMutation = <
 >(
   mutationDefinitionFactory: (
     variables: TVariables
-  ) => NextFetchDefinition<TData>,
-  options: UseNextMutationOptions<TContext, TError, TData, TVariables> = {}
-): UseNextMutationResult<TData, TError, TVariables> => {
+  ) => NexusDefinition<TData>,
+  options: UseNexusMutationOptions<TContext, TError, TData, TVariables> = {}
+): UseNexusMutationResult<TData, TError, TVariables> => {
   if (
     !isMutationDefinition(mutationDefinitionFactory(undefined as TVariables))
   ) {
     throw new Error(
-      'useNextMutation only accepts POST, PUT, PATCH, DELETE definitions'
+      'useNexusMutation only accepts POST, PUT, PATCH, DELETE definitions'
     );
   }
 
@@ -115,7 +115,7 @@ export const useNextMutation = <
             ? { ...definition, baseURL: '', endpoint: route }
             : definition;
 
-          const response = await nextFetch(finalDefinition);
+          const response = await nexus(finalDefinition);
           const { data, headers } = response;
 
           dispatch({

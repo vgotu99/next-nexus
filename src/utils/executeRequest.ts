@@ -1,6 +1,6 @@
 import { trackRequestError, trackRequestTimeout } from '@/debug/tracker';
-import { isNextFetchError } from '@/errors/errorFactory';
-import type { InternalNextFetchResponse } from '@/types/internal';
+import { isNexusError } from '@/errors/errorFactory';
+import type { InternalNexusResponse } from '@/types/internal';
 
 import {
   validateUrl,
@@ -23,7 +23,7 @@ const handleErrorResponse = async (
 
 export const executeRequest = async <T>(
   request: Request
-): Promise<InternalNextFetchResponse<T | undefined>> => {
+): Promise<InternalNexusResponse<T | undefined>> => {
   const startTime = performance.now();
 
   try {
@@ -54,7 +54,7 @@ export const executeRequest = async <T>(
       });
     }
 
-    if (isNextFetchError(error)) {
+    if (isNexusError(error)) {
       throw error;
     }
 

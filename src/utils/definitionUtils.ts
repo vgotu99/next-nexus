@@ -1,16 +1,16 @@
 import type {
-  NextFetchDefinition,
-  CreateNextFetchDefinitionConfig,
-  GetNextFetchDefinition,
-  PostNextFetchDefinition,
-  PutNextFetchDefinition,
-  PatchNextFetchDefinition,
-  DeleteNextFetchDefinition,
+  NexusDefinition,
+  CreateNexusDefinitionConfig,
+  GetNexusDefinition,
+  PostNexusDefinition,
+  PutNexusDefinition,
+  PatchNexusDefinition,
+  DeleteNexusDefinition,
   DefinitionCreator,
 } from '@/types/definition';
-import type { NextFetchRequestConfig } from '@/types/request';
+import type { NexusRequestConfig } from '@/types/request';
 
-const validateConfig = (definition: NextFetchDefinition): void => {
+const validateConfig = (definition: NexusDefinition): void => {
   const { method, endpoint } = definition;
   if (!method) {
     throw new Error('Method is required');
@@ -23,22 +23,22 @@ const validateConfig = (definition: NextFetchDefinition): void => {
   }
 };
 
-export const createNextFetchDefinition = (
-  defaultConfig: NextFetchRequestConfig
+export const createNexusDefinition = (
+  defaultConfig: NexusRequestConfig
 ): DefinitionCreator => {
-  return <TResponse = unknown>(config: CreateNextFetchDefinitionConfig) => {
+  return <TResponse = unknown>(config: CreateNexusDefinitionConfig) => {
     const { headers: defaultConfigHeaders, ...restDefaultConfig } =
       defaultConfig;
     const { headers: configHeaders, ...restConfig } = config;
 
-    const definition: NextFetchDefinition<TResponse> = {
+    const definition: NexusDefinition<TResponse> = {
       ...restDefaultConfig,
       ...restConfig,
       headers: {
         ...defaultConfigHeaders,
         ...configHeaders,
       },
-    } as NextFetchDefinition<TResponse>;
+    } as NexusDefinition<TResponse>;
 
     validateConfig(definition);
 
@@ -47,17 +47,17 @@ export const createNextFetchDefinition = (
 };
 
 export const isGetDefinition = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
-): definition is GetNextFetchDefinition<TResponse> => {
+  definition: NexusDefinition<TResponse>
+): definition is GetNexusDefinition<TResponse> => {
   return definition.method === 'GET';
 };
 
 export const isMutationDefinition = <TResponse>(
-  definition: NextFetchDefinition<TResponse>
+  definition: NexusDefinition<TResponse>
 ): definition is
-  | PostNextFetchDefinition<TResponse>
-  | PutNextFetchDefinition<TResponse>
-  | PatchNextFetchDefinition<TResponse>
-  | DeleteNextFetchDefinition<TResponse> => {
+  | PostNexusDefinition<TResponse>
+  | PutNexusDefinition<TResponse>
+  | PatchNexusDefinition<TResponse>
+  | DeleteNexusDefinition<TResponse> => {
   return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(definition.method);
 };

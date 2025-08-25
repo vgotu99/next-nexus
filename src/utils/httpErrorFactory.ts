@@ -1,6 +1,6 @@
 import { ERROR_CODES } from '@/constants/errorCodes';
-import { createNextFetchError } from '@/errors/errorFactory';
-import type { NextFetchErrorData, NextFetchErrorInfo } from '@/types/error';
+import { createNexusError } from '@/errors/errorFactory';
+import type { NexusErrorData, NexusErrorInfo } from '@/types/error';
 import {
   extractErrorMessage,
   getErrorCodeByStatus,
@@ -11,13 +11,13 @@ export const createHttpError = (
   status: number,
   response: Response,
   request: Request,
-  errorData: NextFetchErrorData
-): NextFetchErrorInfo => {
+  errorData: NexusErrorData
+): NexusErrorInfo => {
   const message =
     extractErrorMessage(errorData) || getErrorMessageByStatus(status);
   const code = getErrorCodeByStatus(status);
 
-  return createNextFetchError(message, {
+  return createNexusError(message, {
     response,
     request,
     data: errorData,
@@ -29,7 +29,7 @@ export const validateUrl = (url: string): void => {
   try {
     new URL(url);
   } catch (error) {
-    throw createNextFetchError('Invalid URL', {
+    throw createNexusError('Invalid URL', {
       request: new Request(url),
       code: ERROR_CODES.INVALID_URL_ERROR,
     });
@@ -39,20 +39,20 @@ export const validateUrl = (url: string): void => {
 export const createNetworkError = (
   error: unknown,
   request: Request
-): NextFetchErrorInfo => {
+): NexusErrorInfo => {
   if (error instanceof TypeError) {
     if (
       error.message.includes('Failed to fetch') ||
       error.message.includes('NetworkError')
     ) {
-      return createNextFetchError('Network Error', {
+      return createNexusError('Network Error', {
         request,
         code: ERROR_CODES.NETWORK_ERROR,
       });
     }
 
     if (error.message.includes('CORS')) {
-      return createNextFetchError('CORS Error', {
+      return createNexusError('CORS Error', {
         request,
         code: ERROR_CODES.NETWORK_ERROR,
       });
@@ -61,12 +61,12 @@ export const createNetworkError = (
 
   if (error instanceof DOMException && error.name === 'AbortError') {
     if (error.message === 'timeout') {
-      return createNextFetchError('Request timeout', {
+      return createNexusError('Request timeout', {
         request,
         code: ERROR_CODES.TIMEOUT_ERROR,
       });
     } else {
-      return createNextFetchError('Request canceled', {
+      return createNexusError('Request canceled', {
         request,
         code: ERROR_CODES.CANCELED_ERROR,
       });
@@ -74,13 +74,13 @@ export const createNetworkError = (
   }
 
   if (error instanceof SyntaxError && error.message.includes('JSON')) {
-    return createNextFetchError('Invalid JSON response', {
+    return createNexusError('Invalid JSON response', {
       request,
       code: ERROR_CODES.BAD_RESPONSE_ERROR,
     });
   }
 
-  return createNextFetchError(
+  return createNexusError(
     error instanceof Error ? error.message : 'Unknown error',
     {
       request,

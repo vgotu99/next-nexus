@@ -1,4 +1,4 @@
-export interface UseNextQueryOptions<TData = unknown, TSelectedData = TData> {
+export interface UseNexusQueryOptions<TData = unknown, TSelectedData = TData> {
   route?: string;
   enabled?: boolean;
   select?: (data: TData) => TSelectedData;
@@ -6,7 +6,7 @@ export interface UseNextQueryOptions<TData = unknown, TSelectedData = TData> {
   refetchOnMount?: boolean;
 }
 
-export interface UseNextQueryResult<TSelectedData = unknown> {
+export interface UseNexusQueryResult<TSelectedData = unknown> {
   data: TSelectedData | undefined;
   headers: Headers | undefined;
   error: Error | null;
@@ -16,12 +16,12 @@ export interface UseNextQueryResult<TSelectedData = unknown> {
   refetch: () => Promise<void>;
 }
 
-export type NextQueryState<TSelectedData = unknown> = Omit<
-  UseNextQueryResult<TSelectedData>,
+export type NexusQueryState<TSelectedData = unknown> = Omit<
+  UseNexusQueryResult<TSelectedData>,
   'refetch'
 >;
 
-export interface UseNextMutationOptions<
+export interface UseNexusMutationOptions<
   TContext = unknown,
   TError = Error,
   TData = unknown,
@@ -47,7 +47,7 @@ export interface UseNextMutationOptions<
   ) => void | Promise<void>;
 }
 
-export interface UseNextMutationResult<
+export interface UseNexusMutationResult<
   TData = unknown,
   TError = Error,
   TVariables = unknown,
@@ -63,12 +63,12 @@ export interface UseNextMutationResult<
   reset: () => void;
 }
 
-export type NextMutationState<TData = unknown, TError = Error> = Omit<
-  UseNextMutationResult<TData, TError, unknown>,
+export type NexusMutationState<TData = unknown, TError = Error> = Omit<
+  UseNexusMutationResult<TData, TError, unknown>,
   'mutate' | 'mutateAsync' | 'reset'
 >;
 
-export interface UseNextActionOptions<
+export interface UseNexusActionOptions<
   TResult = unknown,
   TArgs extends unknown[] = [FormData],
 > {
@@ -82,7 +82,7 @@ export interface UseNextActionOptions<
   ) => void | Promise<void>;
 }
 
-export interface UseNextActionResult<
+export interface UseNexusActionResult<
   TResult = unknown,
   TError = Error,
   TArgs extends unknown[] = unknown[],
@@ -97,12 +97,12 @@ export interface UseNextActionResult<
   reset: () => void;
 }
 
-export type NextActionState<TResult = unknown, TError = Error> = Omit<
-  UseNextActionResult<TResult, TError, unknown[]>,
+export type NexusActionState<TResult = unknown, TError = Error> = Omit<
+  UseNexusActionResult<TResult, TError, unknown[]>,
   'execute' | 'executeAsync' | 'reset'
 >;
 
-export interface UseNextFormActionOptions<TResult = unknown> {
+export interface UseNexusFormActionOptions<TResult = unknown> {
   onStart?: () => void | Promise<void>;
   onSuccess?: (result: TResult) => void | Promise<void>;
   onError?: (error: Error) => void | Promise<void>;
@@ -112,7 +112,7 @@ export interface UseNextFormActionOptions<TResult = unknown> {
   ) => void | Promise<void>;
 }
 
-export interface UseNextFormActionResult<TResult = unknown, TError = Error> {
+export interface UseNexusFormActionResult<TResult = unknown, TError = Error> {
   formAction: (formData: FormData) => void;
   isPending: boolean;
   isSuccess: boolean;
@@ -122,7 +122,7 @@ export interface UseNextFormActionResult<TResult = unknown, TError = Error> {
   reset: () => void;
 }
 
-export type NextFormActionState<TResult = unknown, TError = Error> = Omit<
-  UseNextFormActionResult<TResult, TError>,
+export type NexusFormActionState<TResult = unknown, TError = Error> = Omit<
+  UseNexusFormActionResult<TResult, TError>,
   'formAction' | 'reset'
 >;

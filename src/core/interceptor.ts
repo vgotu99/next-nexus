@@ -1,6 +1,6 @@
 import {
-  NextFetchRequestInterceptor,
-  NextFetchResponseInterceptor,
+  NexusRequestInterceptor,
+  NexusResponseInterceptor,
 } from '@/types/interceptor';
 
 const createInterceptorManager = <T>() => {
@@ -36,14 +36,14 @@ const createInterceptorManager = <T>() => {
 };
 
 export const createRequestInterceptor = () => {
-  const manager = createInterceptorManager<NextFetchRequestInterceptor>();
+  const manager = createInterceptorManager<NexusRequestInterceptor>();
 
   return {
     ...manager,
     use: (
       name: string,
-      onFulfilled: NextFetchRequestInterceptor['onFulfilled'],
-      onRejected?: NextFetchRequestInterceptor['onRejected'],
+      onFulfilled: NexusRequestInterceptor['onFulfilled'],
+      onRejected?: NexusRequestInterceptor['onRejected'],
     ): void => {
       manager.use(name, { name, onFulfilled, onRejected });
     },
@@ -51,14 +51,14 @@ export const createRequestInterceptor = () => {
 };
 
 export const createResponseInterceptor = () => {
-  const manager = createInterceptorManager<NextFetchResponseInterceptor<unknown>>();
+  const manager = createInterceptorManager<NexusResponseInterceptor<unknown>>();
 
   return {
     ...manager,
     use: (
       name: string,
-      onFulfilled: NextFetchResponseInterceptor<unknown>['onFulfilled'],
-      onRejected?: NextFetchResponseInterceptor<unknown>['onRejected'],
+      onFulfilled: NexusResponseInterceptor<unknown>['onFulfilled'],
+      onRejected?: NexusResponseInterceptor<unknown>['onRejected'],
     ): void => {
       manager.use(name, { name, onFulfilled, onRejected });
     },

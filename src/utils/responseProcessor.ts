@@ -1,6 +1,6 @@
 import { ERROR_CODES } from '@/constants/errorCodes';
-import { createNextFetchError } from '@/errors/errorFactory';
-import type { InternalNextFetchResponse } from '@/types/internal';
+import { createNexusError } from '@/errors/errorFactory';
+import type { InternalNexusResponse } from '@/types/internal';
 
 export const isJsonResponse = (response: Response): boolean => {
   return (
@@ -12,18 +12,18 @@ export const parseJsonResponse = async <T>(response: Response): Promise<T> => {
   try {
     return await response.json();
   } catch (error) {
-    throw createNextFetchError('Invalid JSON response', {
+    throw createNexusError('Invalid JSON response', {
       request: new Request(response.url),
       code: ERROR_CODES.BAD_RESPONSE_ERROR,
     });
   }
 };
 
-export const createNextFetchResponse = <T>(
+export const createNexusResponse = <T>(
   response: Response,
   data: T | undefined
-): InternalNextFetchResponse<T | undefined> => {
-  const internalResponse: InternalNextFetchResponse<T | undefined> = {
+): InternalNexusResponse<T | undefined> => {
+  const internalResponse: InternalNexusResponse<T | undefined> = {
     ...response,
     data,
     status: response.status,
@@ -40,7 +40,7 @@ export const createNextFetchResponse = <T>(
     text: () => response.text(),
     clone: () => {
       const clonedResponse = response.clone();
-      return createNextFetchResponse(clonedResponse, data);
+      return createNexusResponse(clonedResponse, data);
     },
   };
 

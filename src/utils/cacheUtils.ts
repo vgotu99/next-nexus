@@ -1,5 +1,5 @@
 import type { CacheKeyOptions, CacheEntry } from '@/types/cache';
-import type { GetNextFetchDefinition } from '@/types/definition';
+import type { GetNexusDefinition } from '@/types/definition';
 import { getCurrentTimestamp, isPast } from '@/utils/timeUtils';
 
 const buildTagsComponent = (
@@ -33,7 +33,7 @@ export const generateCacheKey = ({
 };
 
 export const generateCacheKeyFromDefinition = (
-  definition: GetNextFetchDefinition
+  definition: GetNexusDefinition
 ): string => {
   const { method, endpoint, client, server, baseURL } = definition;
 

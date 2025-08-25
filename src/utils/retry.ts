@@ -1,5 +1,5 @@
 import { ERROR_CODES } from '@/constants/errorCodes';
-import { isNextFetchError } from '@/errors/errorFactory';
+import { isNexusError } from '@/errors/errorFactory';
 import { logger } from '@/utils/logger';
 
 import { setupTimeout } from './setupTimeout';
@@ -13,7 +13,7 @@ interface RetryConfig<T> {
 }
 
 const shouldRetry = (error: unknown): boolean => {
-  if (!isNextFetchError(error)) return true;
+  if (!isNexusError(error)) return true;
 
   const { code } = error;
 

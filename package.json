@@ -1,5 +1,5 @@
 {
-  "name": "next-fetch",
+  "name": "next-nexus",
   "version": "1.0.0",
   "description": "Axios-style HTTP client built on Fetch API for Next.js, with built-in server and client-side caching",
   "main": "index.ts",

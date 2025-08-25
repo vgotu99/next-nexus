@@ -3,9 +3,9 @@
 import { useCallback, useReducer, useTransition } from 'react';
 
 import type {
-  NextActionState,
-  UseNextActionOptions,
-  UseNextActionResult,
+  NexusActionState,
+  UseNexusActionOptions,
+  UseNexusActionResult,
 } from '@/types/hooks';
 
 type ActionReducerEvent<TResult, TError> =
@@ -15,9 +15,9 @@ type ActionReducerEvent<TResult, TError> =
   | { type: 'RESET' };
 
 const actionReducer = <TResult, TError>(
-  state: NextActionState<TResult, TError>,
+  state: NexusActionState<TResult, TError>,
   event: ActionReducerEvent<TResult, TError>
-): NextActionState<TResult, TError> => {
+): NexusActionState<TResult, TError> => {
   switch (event.type) {
     case 'SET_PENDING':
       return {
@@ -57,16 +57,16 @@ const actionReducer = <TResult, TError>(
   }
 };
 
-export const useNextAction = <
+export const useNexusAction = <
   TResult = unknown,
   TError extends Error = Error,
   TArgs extends unknown[] = unknown[],
 >(
   serverAction: (...args: TArgs) => Promise<TResult>,
-  options: UseNextActionOptions<TResult, TArgs> = {}
-): UseNextActionResult<TResult, TError, TArgs> => {
+  options: UseNexusActionOptions<TResult, TArgs> = {}
+): UseNexusActionResult<TResult, TError, TArgs> => {
   if (typeof serverAction !== 'function') {
-    throw new Error('useNextAction: serverAction must be a function');
+    throw new Error('useNexusAction: serverAction must be a function');
   }
 
   const { onStart, onSuccess, onError, onSettled } = options;
@@ -84,7 +84,7 @@ export const useNextAction = <
   const executeAction = useCallback(
     async (...args: TArgs): Promise<TResult> => {
       if (state.isPending || isTransitionPending) {
-        throw new Error('useNextAction: action is already in progress');
+        throw new Error('useNexusAction: action is already in progress');
       }
 
       if (onStart) {

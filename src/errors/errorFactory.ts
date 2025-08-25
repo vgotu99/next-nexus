@@ -1,14 +1,14 @@
 import type {
-  NextFetchErrorData,
-  NextFetchErrorInfo,
-  NextFetchErrorOptions,
-  NextFetchErrorResponse,
+  NexusErrorData,
+  NexusErrorInfo,
+  NexusErrorOptions,
+  NexusErrorResponse,
 } from '@/types/error';
 
 const createErrorResponse = (
   response: Response,
-  data?: NextFetchErrorData
-): NextFetchErrorResponse => ({
+  data?: NexusErrorData
+): NexusErrorResponse => ({
   status: response.status,
   statusText: response.statusText,
   headers: response.headers,
@@ -16,8 +16,8 @@ const createErrorResponse = (
 });
 
 const errorPropertyDefinitions: Array<{
-  key: keyof Omit<NextFetchErrorOptions, 'data'>;
-  getValue: (options: NextFetchErrorOptions) => any;
+  key: keyof Omit<NexusErrorOptions, 'data'>;
+  getValue: (options: NexusErrorOptions) => any;
 }> = [
   {
     key: 'response',
@@ -28,15 +28,15 @@ const errorPropertyDefinitions: Array<{
   { key: 'code', getValue: options => options.code },
 ];
 
-export const createNextFetchError = (
+export const createNexusError = (
   message: string,
-  options: NextFetchErrorOptions = {}
-): NextFetchErrorInfo => {
+  options: NexusErrorOptions = {}
+): NexusErrorInfo => {
   const baseError = new Error(message);
 
   const propertyDescriptors: PropertyDescriptorMap = {
     name: {
-      value: 'NextFetchError' as const,
+      value: 'NexusError' as const,
       writable: false,
       enumerable: false,
       configurable: true,
@@ -57,8 +57,8 @@ export const createNextFetchError = (
   return Object.defineProperties(
     baseError,
     propertyDescriptors
-  ) as NextFetchErrorInfo;
+  ) as NexusErrorInfo;
 };
 
-export const isNextFetchError = (error: unknown): error is NextFetchErrorInfo =>
-  error instanceof Error && error.name === 'NextFetchError';
+export const isNexusError = (error: unknown): error is NexusErrorInfo =>
+  error instanceof Error && error.name === 'NexusError';

@@ -9,9 +9,9 @@ import {
 } from 'react';
 
 import type {
-  NextFormActionState,
-  UseNextFormActionOptions,
-  UseNextFormActionResult,
+  NexusFormActionState,
+  UseNexusFormActionOptions,
+  UseNexusFormActionResult,
 } from '@/types/hooks';
 
 type ActionReducerEvent<TResult, TError> =
@@ -21,9 +21,9 @@ type ActionReducerEvent<TResult, TError> =
   | { type: 'RESET' };
 
 const actionReducer = <TResult, TError>(
-  state: NextFormActionState<TResult, TError>,
+  state: NexusFormActionState<TResult, TError>,
   event: ActionReducerEvent<TResult, TError>
-): NextFormActionState<TResult, TError> => {
+): NexusFormActionState<TResult, TError> => {
   switch (event.type) {
     case 'SET_PENDING':
       return {
@@ -65,13 +65,13 @@ const actionReducer = <TResult, TError>(
   }
 };
 
-export function useNextFormAction<
+export function useNexusFormAction<
   TResult = unknown,
   TError extends Error = Error,
 >(
   serverAction: (formData: FormData) => Promise<TResult>,
-  options?: UseNextFormActionOptions<TResult>
-): UseNextFormActionResult<TResult, TError> {
+  options?: UseNexusFormActionOptions<TResult>
+): UseNexusFormActionResult<TResult, TError> {
   const optionsRef = useRef(options);
 
   const [state, dispatch] = useReducer(actionReducer<TResult, TError>, {

@@ -14,17 +14,17 @@ import {
   trackRequestSuccess,
 } from '@/debug/tracker';
 import type { ServerCacheOptions } from '@/types/cache';
-import type { NextFetchDefinition } from '@/types/definition';
+import type { NexusDefinition } from '@/types/definition';
 import type {
   InterceptorHandler,
-  NextFetchInterceptors,
+  NexusInterceptors,
 } from '@/types/interceptor';
 import type {
-  InternalNextFetchRequestConfig,
-  InternalNextFetchResponse,
-  NextOptions,
+  InternalNexusRequestConfig,
+  InternalNexusResponse,
+  NexusOptions,
 } from '@/types/internal';
-import type { NextFetchResponse } from '@/types/response';
+import type { NexusResponse } from '@/types/response';
 import {
   applyRequestInterceptors,
   applyResponseInterceptors,
@@ -50,10 +50,10 @@ import {
 
 const transformServerOptionsToNextOptions = (
   server?: ServerCacheOptions
-): NextOptions | undefined => {
+): NexusOptions | undefined => {
   if (!server) return undefined;
 
-  const nextOptions: NextOptions = {};
+  const nextOptions: NexusOptions = {};
   if (server.revalidate !== undefined) {
     nextOptions.revalidate = server.revalidate;
   }
@@ -65,8 +65,8 @@ const transformServerOptionsToNextOptions = (
 };
 
 const buildRequestConfig = (
-  definition: NextFetchDefinition<unknown>
-): InternalNextFetchRequestConfig => {
+  definition: NexusDefinition<unknown>
+): InternalNexusRequestConfig => {
   const { data, server, ...restOptions } = definition;
 
   const next = transformServerOptionsToNextOptions(server);
@@ -82,7 +82,7 @@ const buildRequestConfig = (
 const createInterceptorInterface = (
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
-): NextFetchInterceptors => ({
+): NexusInterceptors => ({
   request: {
     use: (name, onFulfilled, onRejected?) =>
       requestInterceptor.use(name, onFulfilled, onRejected),
@@ -94,7 +94,7 @@ const createInterceptorInterface = (
     use: (name, onFulfilled, onRejected?) =>
       responseInterceptor.use(
         name,
-        onFulfilled as InterceptorHandler<InternalNextFetchResponse<unknown>>,
+        onFulfilled as InterceptorHandler<InternalNexusResponse<unknown>>,
         onRejected
       ),
     remove: name => responseInterceptor.remove(name),
@@ -115,11 +115,11 @@ const getInboundHeaders = async () => {
 
 const executeRequestWithLifecycle = async <T>(
   url: string,
-  config: InternalNextFetchRequestConfig,
+  config: InternalNexusRequestConfig,
   interceptors: string[],
   requestInterceptor: ReturnType<typeof createRequestInterceptor>,
   responseInterceptor: ReturnType<typeof createResponseInterceptor>
-): Promise<InternalNextFetchResponse<T | null | undefined>> => {
+): Promise<InternalNexusResponse<T | null | undefined>> => {
   const startTime = performance.now();
   trackRequestStart({ url, method: config.method || 'GET' });
 
@@ -214,19 +214,18 @@ const executeRequestWithLifecycle = async <T>(
       }
     }
 
-    const responseWithConfig: InternalNextFetchResponse<T | undefined> = {
+    const responseWithConfig: InternalNexusResponse<T | undefined> = {
       ...response,
       config: modifiedConfig,
       request: new Request(url, modifiedConfig),
       clone: () => {
         const clonedResponse = response.clone();
-        const clonedInternalResponse: InternalNextFetchResponse<T | undefined> =
-          {
-            ...clonedResponse,
-            config: modifiedConfig,
-            request: new Request(url, modifiedConfig),
-            data: clonedResponse.data,
-          };
+        const clonedInternalResponse: InternalNexusResponse<T | undefined> = {
+          ...clonedResponse,
+          config: modifiedConfig,
+          request: new Request(url, modifiedConfig),
+          data: clonedResponse.data,
+        };
         return clonedInternalResponse;
       },
     };
@@ -302,8 +301,8 @@ const globalResponseInterceptor = createResponseInterceptor();
 const createResponseFromClientCache = <T>(
   entry: { data: T },
   url: string,
-  config: InternalNextFetchRequestConfig
-): NextFetchResponse<T> => {
+  config: InternalNexusRequestConfig
+): NexusResponse<T> => {
   const response = new Response(JSON.stringify(entry.data), {
     status: 200,
     statusText: 'OK',
@@ -330,12 +329,12 @@ const createResponseFromClientCache = <T>(
     body: response.body,
     bodyUsed: false,
     clone: () => createResponseFromClientCache(entry, url, config),
-  } as NextFetchResponse<T>;
+  } as NexusResponse<T>;
 };
 
-export const nextFetch = async <T>(
-  definition: NextFetchDefinition<T>
-): Promise<NextFetchResponse<T>> => {
+export const nexus = async <T>(
+  definition: NexusDefinition<T>
+): Promise<NexusResponse<T>> => {
   const { baseURL, endpoint, interceptors, method } = definition;
   const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
 
@@ -395,10 +394,10 @@ export const nextFetch = async <T>(
     globalResponseInterceptor
   );
 
-  return response as NextFetchResponse<T>;
+  return response as NexusResponse<T>;
 };
 
-export const interceptors: NextFetchInterceptors = createInterceptorInterface(
+export const interceptors: NexusInterceptors = createInterceptorInterface(
   globalRequestInterceptor,
   globalResponseInterceptor
 );

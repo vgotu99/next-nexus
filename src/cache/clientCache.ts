@@ -1,6 +1,6 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
 import type { CacheHandler } from '@/types/cache';
-import type { NextFetchDefinition } from '@/types/definition';
+import type { NexusDefinition } from '@/types/definition';
 import {
   generateCacheKeyFromDefinition,
   isCacheEntryExpired,
@@ -9,10 +9,10 @@ import { isGetDefinition } from '@/utils/definitionUtils';
 import { logger } from '@/utils/logger';
 
 const validateGetDefinition = (
-  definition: NextFetchDefinition<unknown>
+  definition: NexusDefinition<unknown>
 ): void => {
   if (!isGetDefinition(definition)) {
-    logger.warn('[Cache] clientCache is primarily designed for GET requests. Using it with mutation definitions may not work as expected.');
+    logger.warn('[Cache] nexusCache is primarily designed for GET requests. Using it with mutation definitions may not work as expected.');
   }
 };
 
@@ -68,13 +68,13 @@ const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
   };
 };
 
-export const clientCache = <TData = unknown>(
-  definition: NextFetchDefinition<TData>
+export const nexusCache = <TData = unknown>(
+  definition: NexusDefinition<TData>
 ): CacheHandler<TData> => {
   validateGetDefinition(definition);
 
   if (!isGetDefinition(definition)) {
-    throw new Error('clientCache only supports GET definitions');
+    throw new Error('nexusCache only supports GET definitions');
   }
 
   const cacheKey = generateCacheKeyFromDefinition(definition);

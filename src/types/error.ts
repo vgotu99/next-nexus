@@ -1,30 +1,30 @@
 import type { ERROR_CODES } from '@/constants/errorCodes';
 
-export interface NextFetchErrorData {
+export interface NexusErrorData {
   message?: string;
   error?: string;
   detail?: string;
   [key: string]: unknown;
 }
 
-export interface NextFetchErrorResponse {
-  data?: NextFetchErrorData;
+export interface NexusErrorResponse {
+  data?: NexusErrorData;
   status: number;
   statusText: string;
   headers: Headers;
 }
 
-export interface NextFetchErrorOptions {
+export interface NexusErrorOptions {
   response?: Response;
   request?: Request;
-  data?: NextFetchErrorData;
+  data?: NexusErrorData;
   config?: RequestInit;
   code?: ErrorCode;
 }
 
-export interface NextFetchErrorInfo extends Error {
-  readonly name: 'NextFetchError';
-  readonly response?: NextFetchErrorResponse;
+export interface NexusErrorInfo extends Error {
+  readonly name: 'NexusError';
+  readonly response?: NexusErrorResponse;
   readonly request?: Request;
   readonly config?: RequestInit;
   readonly code?: ErrorCode;

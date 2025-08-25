@@ -4,19 +4,19 @@ import { useEffect } from 'react';
 
 import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import NextFetchClientInitializer from '@/core/NextFetchClientInitializer';
-import type { NextFetchProviderProps } from '@/providers/NextFetchProvider';
-import type { NextFetchPayload } from '@/types/payload';
+import NexusClientInitializer from '@/core/NexusClientInitializer';
+import type { NexusProviderProps } from '@/providers/NexusProvider';
+import type { NexusPayload } from '@/types/payload';
 import { isClientEnvironment, isDevelopment } from '@/utils/environmentUtils';
 import { logger } from '@/utils/logger';
 
-const getNextFetchPayload = (): NextFetchPayload | null => {
-  if (!isClientEnvironment() || !window.__NEXT_FETCH_PAYLOAD__) {
+const getNexusPayload = (): NexusPayload | null => {
+  if (!isClientEnvironment() || !window.__NEXUS_PAYLOAD__) {
     return null;
   }
 
   try {
-    return window.__NEXT_FETCH_PAYLOAD__;
+    return window.__NEXUS_PAYLOAD__;
   } catch (error) {
     logger.warn('[Provider] Failed to parse hydration payload', error);
     return null;
@@ -24,7 +24,7 @@ const getNextFetchPayload = (): NextFetchPayload | null => {
 };
 
 const hydrateClientCache = (
-  hydrationData: NextFetchPayload['hydrationData']
+  hydrationData: NexusPayload['hydrationData']
 ): number => {
   const entries = Object.entries(hydrationData);
 
@@ -65,9 +65,9 @@ const applyTTLExtensions = (notModifiedKeys: readonly string[]): number => {
 
 const cleanupResources = (): void => {
   try {
-    delete window.__NEXT_FETCH_PAYLOAD__;
+    delete window.__NEXUS_PAYLOAD__;
 
-    const scriptElement = document.getElementById('__NEXT_FETCH_SCRIPT__');
+    const scriptElement = document.getElementById('__NEXUS_SCRIPT__');
     scriptElement?.remove();
   } catch (error) {
     logger.warn('[Provider] Failed to cleanup resources', error);
@@ -83,14 +83,15 @@ const logInitializationResult = (
   const totalOperations = hydratedCount + extendedCount;
 
   if (totalOperations > 0) {
-    logger.info(`[Provider] Initialized - Hydrated: ${hydratedCount}, Extended: ${extendedCount}`);
+    logger.info(
+      `[Provider] Initialized - Hydrated: ${hydratedCount}, Extended: ${extendedCount}`
+    );
   }
 };
 
-
-export const initNextFetchClient = (): void => {
+export const initNexusClient = (): void => {
   try {
-    const payload = getNextFetchPayload();
+    const payload = getNexusPayload();
 
     if (!payload) {
       return;
@@ -106,19 +107,16 @@ export const initNextFetchClient = (): void => {
   }
 };
 
-const ClientNextFetchProvider = ({
-  children,
-  maxSize,
-}: NextFetchProviderProps) => {
+const ClientNexusProvider = ({ children, maxSize }: NexusProviderProps) => {
   useEffect(() => {
     if (maxSize) {
       clientCacheStore.setMaxSize(maxSize);
     }
 
-    initNextFetchClient();
+    initNexusClient();
   }, [maxSize]);
 
-  return <NextFetchClientInitializer>{children}</NextFetchClientInitializer>;
+  return <NexusClientInitializer>{children}</NexusClientInitializer>;
 };
 
-export default ClientNextFetchProvider;
+export default ClientNexusProvider;

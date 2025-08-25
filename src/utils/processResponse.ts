@@ -1,20 +1,20 @@
-import type { InternalNextFetchResponse } from '@/types/internal';
+import type { InternalNexusResponse } from '@/types/internal';
 
 import {
   isJsonResponse,
   parseJsonResponse,
-  createNextFetchResponse,
+  createNexusResponse,
 } from './responseProcessor';
 
 export const processResponse = async <T>(
   response: Response,
   _requestMethod?: string
-): Promise<InternalNextFetchResponse<T | undefined>> => {
+): Promise<InternalNexusResponse<T | undefined>> => {
   const data = isJsonResponse(response)
     ? await parseJsonResponse<T>(response)
     : undefined;
 
-  const nextFetchResponse = createNextFetchResponse(response, data);
+  const nexusResponse = createNexusResponse(response, data);
 
-  return nextFetchResponse;
+  return nexusResponse;
 };

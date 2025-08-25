@@ -14,7 +14,7 @@ import { generateBaseKey } from '@/utils/cacheUtils';
 const initializeRscRequestInterceptor = (): (() => void) => {
   const originalFetch = window.fetch;
 
-  if ('__nextFetchIntercepted' in originalFetch) {
+  if ('__nexusIntercepted' in originalFetch) {
     return () => {};
   }
 
@@ -70,7 +70,7 @@ const initializeRscRequestInterceptor = (): (() => void) => {
     return originalFetch(input, init);
   };
 
-  Object.defineProperty(interceptedFetch, '__nextFetchIntercepted', {
+  Object.defineProperty(interceptedFetch, '__nexusIntercepted', {
     value: true,
     writable: false,
   });
@@ -84,7 +84,7 @@ const initializeRscRequestInterceptor = (): (() => void) => {
   };
 };
 
-const NextFetchClientInitializer = ({ children }: { children: ReactNode }) => {
+const NexusClientInitializer = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const cleanup = initializeRscRequestInterceptor();
 
@@ -94,4 +94,4 @@ const NextFetchClientInitializer = ({ children }: { children: ReactNode }) => {
   return <>{children}</>;
 };
 
-export default NextFetchClientInitializer;
+export default NexusClientInitializer;
