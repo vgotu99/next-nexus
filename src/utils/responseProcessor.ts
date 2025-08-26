@@ -13,7 +13,6 @@ export const parseJsonResponse = async <T>(response: Response): Promise<T> => {
     return await response.json();
   } catch (error) {
     throw createNexusError('Invalid JSON response', {
-      request: new Request(response.url),
       code: ERROR_CODES.BAD_RESPONSE_ERROR,
     });
   }
