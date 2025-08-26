@@ -1,4 +1,5 @@
 export interface ServerCacheOptions {
+  cache?: RequestCache;
   revalidate?: number;
   tags?: string[];
 }

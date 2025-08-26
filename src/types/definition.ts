@@ -2,12 +2,11 @@ import type { NexusRequestConfig } from './request';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
-type BaseNexusDefinition<TResponse = unknown> =
-  Readonly<NexusRequestConfig> & {
-    readonly method: HttpMethod;
-    readonly endpoint: string;
-    readonly _phantomResponse?: TResponse;
-  };
+type BaseNexusDefinition<TResponse = unknown> = Readonly<NexusRequestConfig> & {
+  readonly method: HttpMethod;
+  readonly endpoint: string;
+  readonly _phantomResponse?: TResponse;
+};
 
 export interface GetNexusDefinition<TResponse = unknown>
   extends BaseNexusDefinition<TResponse> {
@@ -46,8 +45,7 @@ export type NexusDefinition<TResponse = unknown> =
   | PatchNexusDefinition<TResponse>
   | DeleteNexusDefinition<TResponse>;
 
-export interface CreateNexusDefinitionConfig
-  extends NexusRequestConfig {
+export interface NexusDefinitionConfig extends NexusRequestConfig {
   method: HttpMethod;
   endpoint: string;
   data?: unknown;
@@ -61,7 +59,3 @@ export type MutationDefinition<TResponse = unknown, TVariables = unknown> = (
 ) & {
   readonly _phantomVariables?: TVariables;
 };
-
-export type DefinitionCreator = <TResponse = unknown>(
-  config: CreateNexusDefinitionConfig
-) => NexusDefinition<TResponse>;

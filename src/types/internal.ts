@@ -1,7 +1,8 @@
-import { NexusRequestConfig } from '@/types/request';
-import { NexusResponse } from '@/types/response';
+import type { NexusDefinitionConfig } from '@/types/definition';
+import type { NexusResponse } from '@/types/response';
 
-export interface InternalNexusRequestConfig extends NexusRequestConfig {
+export interface InternalNexusRequestConfig extends NexusDefinitionConfig {
+  body?: BodyInit | null;
   timeoutId?: NodeJS.Timeout;
   next?: NexusOptions;
 }
