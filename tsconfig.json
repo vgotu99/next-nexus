@@ -31,9 +31,10 @@
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "jest.config.js"
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "jest.config.ts",
+    "tests/setup.ts"
   ],
   "exclude": ["node_modules", "dist", "build"]
 }
