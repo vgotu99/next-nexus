@@ -1,40 +1,5 @@
 import { ERROR_CODES } from '@/constants/errorCodes';
-import { ERROR_MESSAGES } from '@/constants/errorMessages';
-import type {
-  ErrorCode,
-  ErrorMessageTemplate,
-  NexusErrorData,
-  NexusErrorInfo,
-} from '@/types/error';
-
-const ERROR_MESSAGE_KEYWORDS = {
-  network: ['fetch', 'network', 'offline'],
-  cors: ['CORS', 'cross-origin'],
-  timeout: ['timeout', 'aborted'],
-};
-
-export const isNetworkError = (error: unknown): boolean =>
-  error instanceof Error &&
-  ERROR_MESSAGE_KEYWORDS.network.some(keyword =>
-    error.message.includes(keyword)
-  );
-
-export const isCorsError = (error: unknown): boolean =>
-  error instanceof Error &&
-  ERROR_MESSAGE_KEYWORDS.cors.some(keyword => error.message.includes(keyword));
-
-export const isTimeoutError = (error: unknown): boolean =>
-  error instanceof Error &&
-  ERROR_MESSAGE_KEYWORDS.timeout.some(keyword =>
-    error.message.includes(keyword)
-  );
-
-export const isStatusError = (status: number): boolean => status >= 400;
-
-export const isClientError = (status: number): boolean =>
-  status >= 400 && status < 500;
-
-export const isServerError = (status: number): boolean => status >= 500;
+import type { ErrorCode, NexusErrorData } from '@/types/error';
 
 const STATUS_TO_ERROR_CODE_MAP = new Map<number, ErrorCode>([
   [401, ERROR_CODES.UNAUTHORIZED_ERROR],
@@ -47,7 +12,7 @@ export const getErrorCodeByStatus = (status: number): ErrorCode => {
   if (STATUS_TO_ERROR_CODE_MAP.has(status)) {
     return STATUS_TO_ERROR_CODE_MAP.get(status)!;
   }
-  return isClientError(status)
+  return status >= 400 && status < 500
     ? ERROR_CODES.BAD_REQUEST_ERROR
     : ERROR_CODES.SERVER_ERROR;
 };
@@ -67,14 +32,9 @@ const STATUS_TO_ERROR_MESSAGE_MAP: Record<number, string> = {
 export const getErrorMessageByStatus = (status: number): string => {
   return (
     STATUS_TO_ERROR_MESSAGE_MAP[status] ||
-    (isClientError(status) ? 'Client Error' : 'Server Error')
+    (status >= 400 && status < 500 ? 'Client Error' : 'Server Error')
   );
 };
-
-export const hasErrorCode = (
-  error: NexusErrorInfo,
-  code: ErrorCode
-): boolean => error.code === code;
 
 const ERROR_MESSAGE_KEYS_PRIORITY: Array<keyof NexusErrorData> = [
   'message',
@@ -93,19 +53,4 @@ export const extractErrorMessage = (data: NexusErrorData): string => {
   }
 
   return 'Unknown error occurred';
-};
-
-export const createErrorMessage = (
-  errorCode: ErrorCode,
-  variables: string
-): Omit<ErrorMessageTemplate, 'message'> & { message: string } => {
-  const template = ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.UNKNOWN_ERROR;
-
-  const message = template.message(variables);
-
-  return {
-    message: message,
-    solution: template.solution,
-    documentation: template.documentation,
-  };
 };
