@@ -128,6 +128,7 @@ const executeRequestWithLifecycle = async <T>(
     config,
     requestInterceptors
   );
+  const hasClientOption = typeof modifiedConfig.client !== 'object';
 
   try {
     const response = await retry({
@@ -142,7 +143,11 @@ const executeRequestWithLifecycle = async <T>(
       context: { url, method: modifiedConfig.method || 'GET' },
     });
 
-    if (isServerEnvironment() && modifiedConfig.method === 'GET') {
+    if (
+      isServerEnvironment() &&
+      modifiedConfig.method === 'GET' &&
+      hasClientOption
+    ) {
       const cacheKey = generateCacheKey({
         url,
         method: modifiedConfig.method,
@@ -347,14 +352,15 @@ const createResponseFromClientCache = <T>(
 export const nexus = async <T>(
   definition: NexusDefinition<T>
 ): Promise<NexusResponse<T>> => {
-  const { baseURL, endpoint, interceptors, method } = definition;
+  const { baseURL, endpoint, interceptors, method, client } = definition;
   const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
 
   const cacheKey =
     method === 'GET' && generateCacheKeyFromDefinition(definition);
   const requestConfig = buildRequestConfig(definition);
+  const hasClientOption = typeof client === 'object';
 
-  if (isClientEnvironment() && cacheKey) {
+  if (isClientEnvironment() && cacheKey && hasClientOption) {
     const entry = clientCacheStore.get<T>(cacheKey);
 
     if (entry && !isCacheEntryExpired(entry)) {
@@ -364,7 +370,7 @@ export const nexus = async <T>(
     }
   }
 
-  if (isServerEnvironment() && cacheKey) {
+  if (isServerEnvironment() && cacheKey && hasClientOption) {
     const inboundHeaders = await getInboundHeaders();
 
     if (inboundHeaders) {
