@@ -30,7 +30,6 @@ export const validateUrl = (url: string): void => {
     new URL(url);
   } catch (error) {
     throw createNexusError('Invalid URL', {
-      request: new Request(url),
       code: ERROR_CODES.INVALID_URL_ERROR,
     });
   }
@@ -40,6 +39,22 @@ export const createNetworkError = (
   error: unknown,
   request: Request
 ): NexusErrorInfo => {
+  const signal = request.signal;
+
+  if (signal?.aborted) {
+    if (signal.reason === 'timeout') {
+      return createNexusError('Request timeout', {
+        request,
+        code: ERROR_CODES.TIMEOUT_ERROR,
+      });
+    }
+
+    return createNexusError('Request canceled', {
+      request,
+      code: ERROR_CODES.CANCELED_ERROR,
+    });
+  }
+
   if (error instanceof TypeError) {
     if (
       error.message.includes('Failed to fetch') ||
@@ -60,17 +75,17 @@ export const createNetworkError = (
   }
 
   if (error instanceof DOMException && error.name === 'AbortError') {
-    if (error.message === 'timeout') {
+    if (request.signal?.reason === 'timeout' || error.message === 'timeout') {
       return createNexusError('Request timeout', {
         request,
         code: ERROR_CODES.TIMEOUT_ERROR,
       });
-    } else {
-      return createNexusError('Request canceled', {
-        request,
-        code: ERROR_CODES.CANCELED_ERROR,
-      });
     }
+
+    return createNexusError('Request canceled', {
+      request,
+      code: ERROR_CODES.CANCELED_ERROR,
+    });
   }
 
   if (error instanceof SyntaxError && error.message.includes('JSON')) {
