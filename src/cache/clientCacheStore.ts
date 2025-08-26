@@ -4,6 +4,7 @@ import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,
   extractBaseKeyFromCacheKey,
+  getTTLFromExpiresAt,
   normalizeCacheTags,
 } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
@@ -30,10 +31,7 @@ const notify = (cacheKey: string, entry: ClientCacheEntry | null): void => {
     try {
       callback(entry);
     } catch (error) {
-      logger.error(
-        `[Core] Error in cache listener:`,
-        error
-      );
+      logger.error(`[Core] Error in cache listener:`, error);
     }
   });
 };
@@ -223,7 +221,7 @@ const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
     source: `client-${entry.source}`,
     tags: entry.clientTags,
     revalidate: entry.clientRevalidate,
-    ttl: entry.clientRevalidate,
+    ttl: getTTLFromExpiresAt(entry.expiresAt),
     size: clientCacheState.clientCache.size,
     maxSize: clientCacheState.maxSize,
   });
@@ -249,7 +247,7 @@ const set = <T = unknown>(
     source: `client-${clientCacheEntry.source}`,
     tags: clientCacheEntry.clientTags,
     revalidate: clientCacheEntry.clientRevalidate,
-    ttl: clientCacheEntry.clientRevalidate,
+    ttl: getTTLFromExpiresAt(clientCacheEntry.expiresAt),
     size: clientCacheState.clientCache.size,
     maxSize: clientCacheState.maxSize,
   });
@@ -284,7 +282,7 @@ const update = <T = unknown>(
     source: `client-${updatedEntry.source}`,
     tags: updatedEntry.clientTags,
     revalidate: updatedEntry.clientRevalidate,
-    ttl: updatedEntry.clientRevalidate,
+    ttl: getTTLFromExpiresAt(updatedEntry.expiresAt),
     size: clientCacheState.clientCache.size,
     maxSize: clientCacheState.maxSize,
   });
