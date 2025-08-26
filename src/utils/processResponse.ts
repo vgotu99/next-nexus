@@ -11,7 +11,7 @@ export const processResponse = async <T>(
   _requestMethod?: string
 ): Promise<InternalNexusResponse<T | undefined>> => {
   const data = isJsonResponse(response)
-    ? await parseJsonResponse<T>(response)
+    ? await parseJsonResponse<T>(response.clone())
     : undefined;
 
   const nexusResponse = createNexusResponse(response, data);
