@@ -13,7 +13,6 @@ export const extendCacheEntryTTL = (
 
   clientCacheStore.update(cacheKey, {
     expiresAt: getCurrentTimestamp() + extensionSeconds * 1000,
-    source: 'fetch',
   });
 
   return true;
