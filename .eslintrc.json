@@ -64,5 +64,17 @@
         "project": "./tsconfig.json"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
+      "env": { "jest": true },
+      "rules": {
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "import/no-commonjs": "off",
+        "global-require": "off"
+      }
+    }
+  ]
 }

@@ -48,7 +48,8 @@
     "react-dom": "^18.3.1",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "whatwg-fetch": "^3.6.20"
   },
   "peerDependencies": {
     "next": ">=14.0.0",
