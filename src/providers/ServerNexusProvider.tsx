@@ -47,7 +47,7 @@ const hasPayloadContent = (payload: NexusPayload): boolean => {
   );
 };
 
-export const HydrationScript = async () => {
+const HydrationScript = async () => {
   try {
     const notModifiedKeys = getNotModifiedKeys();
 
