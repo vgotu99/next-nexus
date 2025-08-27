@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useReducer } from 'react';
+import { useCallback, useReducer, useRef } from 'react';
 
 import { nexus } from '@/core/client';
 import type { NexusDefinition } from '@/types/definition';
@@ -69,9 +69,7 @@ export const useNexusMutation = <
   TData = unknown,
   TVariables = unknown,
 >(
-  mutationDefinitionFactory: (
-    variables: TVariables
-  ) => NexusDefinition<TData>,
+  mutationDefinitionFactory: (variables: TVariables) => NexusDefinition<TData>,
   options: UseNexusMutationOptions<TContext, TError, TData, TVariables> = {}
 ): UseNexusMutationResult<TData, TError, TVariables> => {
   if (
@@ -93,73 +91,73 @@ export const useNexusMutation = <
     isError: false,
   });
 
+  const inFlightRef = useRef(false);
+
   const executeMutation = useCallback(
     async (variables: TVariables): Promise<TData> => {
-      if (state.isPending) {
+      if (inFlightRef.current) {
         throw new Error('Mutation is already in progress');
       }
 
-      const context: TContext | undefined = onStart
-        ? await onStart(variables)
-        : undefined;
+      inFlightRef.current = true;
 
-      dispatch({ type: 'SET_PENDING' });
+      try {
+        const context: TContext | undefined = onStart
+          ? await onStart(variables)
+          : undefined;
 
-      const result = await (async (): Promise<{
-        data: TData | undefined;
-        error: TError | null;
-      }> => {
-        try {
-          const definition = mutationDefinitionFactory(variables);
-          const finalDefinition = route
-            ? { ...definition, baseURL: '', endpoint: route }
-            : definition;
+        dispatch({ type: 'SET_PENDING' });
 
-          const response = await nexus(finalDefinition);
-          const { data, headers } = response;
+        const result = await (async (): Promise<{
+          data: TData | undefined;
+          error: TError | null;
+        }> => {
+          try {
+            const definition = mutationDefinitionFactory(variables);
+            const finalDefinition = route
+              ? { ...definition, baseURL: '', endpoint: route }
+              : definition;
 
-          dispatch({
-            type: 'SET_SUCCESS',
-            payload: { data, headers },
-          });
+            const response = await nexus(finalDefinition);
+            const { data, headers } = response;
 
-          if (onSuccess) {
-            await onSuccess(data, variables, context);
+            dispatch({
+              type: 'SET_SUCCESS',
+              payload: { data, headers },
+            });
+
+            if (onSuccess) {
+              await onSuccess(data, variables, context);
+            }
+
+            return { data, error: null };
+          } catch (error) {
+            const typedError = (
+              error instanceof Error ? error : new Error('Unknown error')
+            ) as TError;
+            dispatch({ type: 'SET_ERROR', payload: typedError });
+
+            if (onError) {
+              await onError(typedError, variables, context);
+            }
+
+            return { data: undefined, error: typedError };
           }
+        })();
 
-          return { data, error: null };
-        } catch (error) {
-          const typedError = (
-            error instanceof Error ? error : new Error('Unknown error')
-          ) as TError;
-          dispatch({ type: 'SET_ERROR', payload: typedError });
-
-          if (onError) {
-            await onError(typedError, variables, context);
-          }
-
-          return { data: undefined, error: typedError };
+        if (onSettled) {
+          await onSettled(result.data, result.error, variables, context);
         }
-      })();
 
-      if (onSettled) {
-        await onSettled(result.data, result.error, variables, context);
+        if (result.error) {
+          throw result.error;
+        }
+        return result.data as TData;
+      } finally {
+        inFlightRef.current = false;
       }
-
-      if (result.error) {
-        throw result.error;
-      }
-      return result.data as TData;
     },
-    [
-      state.isPending,
-      route,
-      onStart,
-      onSuccess,
-      onError,
-      onSettled,
-      mutationDefinitionFactory,
-    ]
+    [route, onStart, onSuccess, onError, onSettled, mutationDefinitionFactory]
   );
 
   const mutate = useCallback(
