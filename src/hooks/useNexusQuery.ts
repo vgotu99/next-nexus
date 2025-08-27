@@ -79,7 +79,10 @@ const fetchData = async <TData>(
     ? { ...definition, baseURL: '', endpoint: route }
     : definition;
 
-  const response = await nexus(finalDefinition);
+  const response = await nexus({
+    ...finalDefinition,
+    client: undefined,
+  } as typeof definition);
 
   const etag =
     response.data !== null && response.data !== undefined
