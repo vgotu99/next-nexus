@@ -42,6 +42,7 @@ import {
   isClientEnvironment,
 } from '@/utils/environmentUtils';
 import { executeRequest } from '@/utils/executeRequest';
+import { createNexusResponse } from '@/utils/responseProcessor';
 import { retry } from '@/utils/retry';
 
 import {
@@ -128,7 +129,7 @@ const executeRequestWithLifecycle = async <T>(
     config,
     requestInterceptors
   );
-  const hasClientOption = typeof modifiedConfig.client !== 'object';
+  const hasClientOption = typeof modifiedConfig.client === 'object';
 
   try {
     const response = await retry({
@@ -323,28 +324,20 @@ const createResponseFromClientCache = <T>(
   const response = new Response(JSON.stringify(entry.data), {
     status: 200,
     statusText: 'OK',
-    headers: { [HEADERS.CACHE_STATUS]: 'CLIENT_HIT' },
+    headers: {
+      'content-type': 'application/json',
+      [HEADERS.CACHE_STATUS]: 'CLIENT_HIT',
+    },
   });
 
+  const base = createNexusResponse<T>(response, entry.data);
+
   return {
-    ...response,
-    ok: true,
-    redirected: false,
-    status: 200,
-    statusText: 'OK',
-    type: 'basic',
+    ...base,
     url,
-    data: entry.data,
+    headers: new Headers(response.headers),
     config,
     request: new Request(url, config),
-    headers: new Headers(response.headers),
-    json: () => Promise.resolve(entry.data),
-    text: () => Promise.resolve(JSON.stringify(entry.data)),
-    blob: () => response.blob(),
-    arrayBuffer: () => response.arrayBuffer(),
-    formData: () => response.formData(),
-    body: response.body,
-    bodyUsed: false,
     clone: () => createResponseFromClientCache(entry, url, config),
   } as NexusResponse<T>;
 };
