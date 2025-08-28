@@ -5,6 +5,7 @@ export interface InternalNexusRequestConfig extends NexusDefinitionConfig {
   body?: BodyInit | null;
   timeoutId?: NodeJS.Timeout;
   next?: NexusOptions;
+  cache?: RequestCache;
 }
 
 export interface InternalNexusResponse<T = unknown> extends NexusResponse<T> {
