@@ -1,5 +1,5 @@
-import { nexusCache } from '@/cache/clientCache';
 import { clientCacheStore } from '@/cache/clientCacheStore';
+import { nexusCache } from '@/cache/nexusCache';
 import { generateCacheKeyFromDefinition } from '@/utils/cacheUtils';
 
 jest.mock('@/utils/environmentUtils', () => ({

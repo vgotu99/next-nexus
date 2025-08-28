@@ -2,7 +2,42 @@
   "name": "next-nexus",
   "version": "1.0.0",
   "description": "Axios-style HTTP client built on Fetch API for Next.js, with built-in server and client-side caching",
-  "main": "index.ts",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js",
+      "require": "./dist/client/index.cjs"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "require": "./dist/server/index.cjs"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "import": "./dist/errors/index.js",
+      "require": "./dist/errors/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "jest -c jest.config.ts",
     "test:watch": "jest -c jest.config.ts --watch",
@@ -12,18 +47,21 @@
     "lint:check": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsup",
+    "build:prod": "tsup --minify",
+    "prepublishOnly": "npm run lint:check && npm run test:ci && npm run typecheck && npm run build:prod"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vgotu99/next-fetch.git"
+    "url": "git+https://github.com/vgotu99/next-nexus.git"
   },
   "author": "vgotu99",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/vgotu99/next-fetch/issues"
+    "url": "https://github.com/vgotu99/next-nexus/issues"
   },
-  "homepage": "https://github.com/vgotu99/next-fetch#readme",
+  "homepage": "https://github.com/vgotu99/next-nexus#readme",
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^14.3.1",
@@ -49,7 +87,9 @@
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5",
-    "whatwg-fetch": "^3.6.20"
+    "whatwg-fetch": "^3.6.20",
+    "tsup": "^8.1.0",
+    "esbuild-plugin-tsconfig-paths": "^1.0.1"
   },
   "peerDependencies": {
     "next": ">=14.0.0",
