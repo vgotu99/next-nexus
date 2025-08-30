@@ -1,7 +1,7 @@
 {
   "name": "next-nexus",
   "version": "1.0.0",
-  "description": "Axios-style HTTP client built on Fetch API for Next.js, with built-in server and client-side caching",
+  "description": "The intelligent data layer for Next.js that simplifies your app with automatic caching, seamless hydration, and built-in cost savings.",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
@@ -32,6 +32,7 @@
   "files": [
     "dist",
     "README.md",
+    "README.ko.md",
     "LICENSE"
   ],
   "sideEffects": false,
@@ -58,6 +59,19 @@
   },
   "author": "vgotu99",
   "license": "MIT",
+  "keywords": [
+    "next",
+    "nextjs",
+    "fetch",
+    "data-fetching",
+    "caching",
+    "hydration",
+    "server-components",
+    "rsc",
+    "app-router",
+    "performance",
+    "cost-saving"
+  ],
   "bugs": {
     "url": "https://github.com/vgotu99/next-nexus/issues"
   },
