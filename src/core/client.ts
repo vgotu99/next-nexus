@@ -75,7 +75,7 @@ const buildRequestConfig = (
 
   return {
     ...restOptions,
-    cache: server?.cache,
+    cache: server?.cache ? server.cache : 'no-store',
     next,
     body: data ? JSON.stringify(data) : undefined,
     server,
