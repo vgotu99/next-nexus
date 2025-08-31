@@ -32,7 +32,6 @@
   "files": [
     "dist",
     "README.md",
-    "README.ko.md",
     "LICENSE"
   ],
   "sideEffects": false,
