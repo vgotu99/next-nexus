@@ -1,3 +1,5 @@
+![next-nexus 로고](https://raw.githubusercontent.com/vgotu99/next-nexus-docs/7b34074056d4b60e8afc4ceaa859bf48bf717ed0/public/logo.svg)
+
 <h1 style="display: flex; justify-content: space-between;">
   next-nexus
   <div>
