@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { nexus } from '@/core/client';
+import { nexusClient } from '@/core/nexus.client';
 import type { ClientCacheEntry } from '@/types/cache';
 import type { GetNexusDefinition, NexusDefinition } from '@/types/definition';
 import type {
@@ -79,7 +79,7 @@ const fetchData = async <TData>(
     ? { ...definition, baseURL: '', endpoint: route }
     : definition;
 
-  const response = await nexus({
+  const response = await nexusClient({
     ...finalDefinition,
     client: undefined,
   } as typeof definition);

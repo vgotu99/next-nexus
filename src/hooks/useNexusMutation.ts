@@ -2,7 +2,7 @@
 
 import { useCallback, useReducer, useRef } from 'react';
 
-import { nexus } from '@/core/client';
+import { nexusClient } from '@/core/nexus.client';
 import type { NexusDefinition } from '@/types/definition';
 import type {
   NexusMutationState,
@@ -118,7 +118,7 @@ export const useNexusMutation = <
               ? { ...definition, baseURL: '', endpoint: route }
               : definition;
 
-            const response = await nexus(finalDefinition);
+            const response = await nexusClient(finalDefinition);
             const { data, headers } = response;
 
             dispatch({
