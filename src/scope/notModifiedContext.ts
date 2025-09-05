@@ -2,8 +2,8 @@ import { AsyncLocalStorage } from 'async_hooks';
 
 const notModifiedKeyStorage = new AsyncLocalStorage<Set<string>>();
 
-export const runWithNotModifiedContext = <T>(callback: () => T): T => {
-  return notModifiedKeyStorage.run(new Set<string>(), callback);
+export const enterNotModifiedContext = (): void => {
+  notModifiedKeyStorage.enterWith(new Set<string>());
 };
 
 export const registerNotModifiedKey = (cacheKey: string): void => {

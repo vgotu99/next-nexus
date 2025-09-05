@@ -35,10 +35,11 @@ const keys = async (): Promise<string[]> => {
   return store ? Array.from(store.keys()) : [];
 };
 
-const runWith = async <T = unknown>(
-  callback: () => Promise<T> | T
-): Promise<T> => {
-  return requsetScopeStorage.run(new Map<string, unknown>(), callback);
+const enter = (): void => {
+  const existing = requsetScopeStorage.getStore();
+  if (!existing) {
+    requsetScopeStorage.enterWith(new Map<string, unknown>());
+  }
 };
 
 export const requestScopeStore = {
@@ -46,5 +47,5 @@ export const requestScopeStore = {
   set,
   clear,
   keys,
-  runWith,
+  enter,
 };
