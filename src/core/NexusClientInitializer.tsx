@@ -1,15 +1,51 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 
-import {
-  collectClientCacheMetadata,
-  createClientCacheMetadataHeader,
-} from '@/cache/clientCacheMetadataCollector';
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { HEADERS } from '@/constants/cache';
-import type { ClientCacheMetadata } from '@/types/cache';
-import { generateBaseKey } from '@/utils/cacheUtils';
+import { COOKIES } from '@/constants/cache';
+import type { ClientCacheEntry, ClientCacheMetadata } from '@/types/cache';
+import { getTTLFromExpiresAt } from '@/utils/cacheUtils';
+
+const isRsc = (headers: Headers) => headers.get('RSC') === '1';
+
+const toAbsolute = (input: RequestInfo | URL) => {
+  try {
+    if (typeof input === 'string') return new URL(input, location.origin);
+    if (input instanceof Request) return new URL(input.url, location.origin);
+
+    return new URL(String(input), location.origin);
+  } catch {
+    return null;
+  }
+};
+
+const collectClientCacheMetadata = (
+  cacheKey: string,
+  clientCacheEntry: ClientCacheEntry
+): ClientCacheMetadata => {
+  const ttl = getTTLFromExpiresAt(clientCacheEntry.expiresAt);
+
+  return {
+    ttl,
+    cacheKey,
+    etag: clientCacheEntry.etag,
+  };
+};
+
+const writeCookie = (name: string, value: string, maxAgeSec: number) => {
+  const isHttps =
+    typeof location !== 'undefined' && location.protocol === 'https:';
+  const attrs = [
+    `Path=/`,
+    `SameSite=Lax`,
+    `Max-Age=${maxAgeSec}`,
+    isHttps ? `Secure` : undefined,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  document.cookie = `${name}=${value}; ${attrs}`;
+};
 
 const initializeRscRequestInterceptor = (): (() => void) => {
   const originalFetch = window.fetch;
@@ -23,48 +59,38 @@ const initializeRscRequestInterceptor = (): (() => void) => {
     init?: RequestInit
   ): Promise<Response> => {
     const headers = new Headers(init?.headers);
-    const isRscRequest = headers.get('RSC') === '1';
 
-    if (!isRscRequest) {
+    if (!isRsc(headers)) {
       return originalFetch(input, init);
     }
 
-    const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof Request
-          ? input.url
-          : input.toString();
-    const method = init?.method || 'GET';
+    const url = toAbsolute(input);
 
-    const baseKey = generateBaseKey({ url, method });
-
-    const candidatekeys = clientCacheStore.getCacheKeysFromBaseKey(baseKey);
-
-    if (!candidatekeys || candidatekeys.size === 0) {
+    if (!url) {
       return originalFetch(input, init);
     }
 
-    const clientCacheMetadataArr = Array.from(candidatekeys)
-      .map(cacheKey => {
-        const entry = clientCacheStore.get(cacheKey);
+    const pathname = url.pathname;
 
-        if (!entry) return null;
+    writeCookie(COOKIES.NEXUS_PATHNAME, pathname, 5);
 
-        return collectClientCacheMetadata(cacheKey, entry);
-      })
-      .filter((metaData): metaData is ClientCacheMetadata => metaData !== null);
+    const keys = clientCacheStore.getCacheKeysFromPathname(pathname);
 
-    const clientCacheMetadataHeader =
-      clientCacheMetadataArr.length > 0
-        ? createClientCacheMetadataHeader(clientCacheMetadataArr)
-        : null;
+    if (keys.length === 0) {
+      return originalFetch(input, init);
+    }
 
-    if (clientCacheMetadataHeader) {
-      headers.set(HEADERS.CLIENT_CACHE, clientCacheMetadataHeader);
+    const metadataArr = keys.map(key => {
+      const entry = clientCacheStore.get(key);
+      if (!entry) return null;
 
-      const modifiedInit = { ...init, headers };
-      return originalFetch(input, modifiedInit);
+      return collectClientCacheMetadata(key, entry);
+    });
+
+    if (metadataArr.length > 0) {
+      const encoded = btoa(JSON.stringify(metadataArr));
+
+      writeCookie(COOKIES.NEXUS_CLIENT_CACHE, encoded, 5);
     }
 
     return originalFetch(input, init);
@@ -84,14 +110,14 @@ const initializeRscRequestInterceptor = (): (() => void) => {
   };
 };
 
-const NexusClientInitializer = ({ children }: { children: ReactNode }) => {
+const NexusClientInitializer = () => {
   useEffect(() => {
     const cleanup = initializeRscRequestInterceptor();
 
     return cleanup;
   }, []);
 
-  return <>{children}</>;
+  return null;
 };
 
 export default NexusClientInitializer;
