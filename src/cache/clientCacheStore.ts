@@ -1,9 +1,7 @@
-import { DEFAULT_CLIENT_CACHE_MAX_SIZE } from '@/constants/cache';
 import { trackCache } from '@/debug/tracker';
 import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,
-  extractBaseKeyFromCacheKey,
   getTTLFromExpiresAt,
   normalizeCacheTags,
 } from '@/utils/cacheUtils';
@@ -14,8 +12,9 @@ import { getCurrentTimestamp } from '@/utils/timeUtils';
 const clientCacheState: ClientCacheState = {
   clientCache: new Map(),
   tagIndex: new Map(),
-  baseKeyIndex: new Map(),
-  maxSize: DEFAULT_CLIENT_CACHE_MAX_SIZE,
+  pathnameIndex: new Map(),
+  keyToPathnames: new Map(),
+  maxSize: 200,
 };
 
 const listeners = new Map<
@@ -124,27 +123,68 @@ const unindexTags = (key: string, tags: string[] = []): void => {
   });
 };
 
-const indexBaseKey = (cacheKey: string): void => {
-  const baseKey = extractBaseKeyFromCacheKey(cacheKey);
-  const set = clientCacheState.baseKeyIndex.get(baseKey) ?? new Set<string>();
+const normalizePathname = (pathname?: string): string => {
+  if (!pathname) return '/';
 
-  set.add(cacheKey);
+  const decoded = decodeURI(pathname);
 
-  if (!clientCacheState.baseKeyIndex.has(baseKey)) {
-    clientCacheState.baseKeyIndex.set(baseKey, set);
+  if (!decoded || decoded === '/') return '/';
+
+  return decoded.endsWith('/') ? decoded.slice(0, -1) : decoded;
+};
+
+const indexPathname = (pathname: string, keys: string[] | string): void => {
+  if (!isClientEnvironment()) return;
+  const normalized = normalizePathname(pathname);
+  const list = Array.isArray(keys) ? keys : [keys];
+  const set =
+    clientCacheState.pathnameIndex.get(normalized) ?? new Set<string>();
+
+  list.forEach(key => {
+    set.add(key);
+    const rev = clientCacheState.keyToPathnames.get(key) ?? new Set<string>();
+    rev.add(normalized);
+    clientCacheState.keyToPathnames.set(key, rev);
+  });
+
+  clientCacheState.pathnameIndex.set(normalized, set);
+};
+
+const unindexKeyFromPathname = (pathname: string, key: string): void => {
+  if (!isClientEnvironment()) return;
+  const normalized = normalizePathname(pathname);
+  const set = clientCacheState.pathnameIndex.get(normalized);
+  if (set) {
+    set.delete(key);
+    if (set.size === 0) clientCacheState.pathnameIndex.delete(normalized);
+  }
+  const rev = clientCacheState.keyToPathnames.get(key);
+  if (rev) {
+    rev.delete(normalized);
+    if (rev.size === 0) clientCacheState.keyToPathnames.delete(key);
   }
 };
 
-const unindexBaseKey = (cacheKey: string): void => {
-  const baseKey = extractBaseKeyFromCacheKey(cacheKey);
-  const set = clientCacheState.baseKeyIndex.get(baseKey);
-
+const unindexPathname = (pathname?: string): void => {
+  if (!isClientEnvironment()) return;
+  const normalized = normalizePathname(pathname);
+  const set = clientCacheState.pathnameIndex.get(normalized);
   if (!set) return;
+  set.forEach(key => {
+    const rev = clientCacheState.keyToPathnames.get(key);
+    if (rev) {
+      rev.delete(normalized);
+      if (rev.size === 0) clientCacheState.keyToPathnames.delete(key);
+    }
+  });
+  clientCacheState.pathnameIndex.delete(normalized);
+};
 
-  set.delete(cacheKey);
-  if (set.size === 0) {
-    clientCacheState.baseKeyIndex.delete(baseKey);
-  }
+const getCacheKeysFromPathname = (pathname: string): string[] => {
+  const normalized = normalizePathname(pathname);
+  const keys = clientCacheState.pathnameIndex.get(normalized);
+
+  return Array.from(keys ?? new Set<string>());
 };
 
 const getKeysByTags = (tags: string[]): string[] => {
@@ -185,13 +225,11 @@ const setClientCache = <T = unknown>(
       if (evicted?.clientTags?.length) {
         unindexTags(lruKey, evicted.clientTags);
       }
-      unindexBaseKey(lruKey);
       clientCacheState.clientCache.delete(lruKey);
     }
   }
 
   indexTags(key, entry.clientTags);
-  indexBaseKey(key);
   touchCacheEntry(key, entry);
   notify(key, entry);
 };
@@ -298,7 +336,18 @@ const deleteKey = (key: string): boolean => {
 
   const deleted = clientCacheState.clientCache.delete(key);
   if (deleted) {
-    unindexBaseKey(key);
+    const pathnames = clientCacheState.keyToPathnames.get(key);
+    if (pathnames) {
+      pathnames.forEach(p => {
+        const set = clientCacheState.pathnameIndex.get(p);
+        if (set) {
+          set.delete(key);
+          if (set.size === 0) clientCacheState.pathnameIndex.delete(p);
+        }
+      });
+      clientCacheState.keyToPathnames.delete(key);
+    }
+
     notify(key, null);
     trackCache({
       type: 'DELETE',
@@ -335,10 +384,6 @@ const setMaxSize = (newSize: number): void => {
   }
 };
 
-const getCacheKeysFromBaseKey = (baseKey: string) => {
-  return clientCacheState.baseKeyIndex.get(baseKey);
-};
-
 export const clientCacheStore = {
   get,
   set,
@@ -349,5 +394,8 @@ export const clientCacheStore = {
   getMaxSize,
   subscribe,
   setMaxSize,
-  getCacheKeysFromBaseKey,
+  indexPathname,
+  unindexPathname,
+  unindexKeyFromPathname,
+  getCacheKeysFromPathname,
 };

@@ -40,7 +40,8 @@ export interface ClientCacheEntry<T = unknown> extends CacheEntry<T> {
 export interface ClientCacheState {
   clientCache: Map<string, ClientCacheEntry>;
   tagIndex: Map<string, Set<string>>;
-  baseKeyIndex: Map<string, Set<string>>;
+  pathnameIndex: Map<string, Set<string>>;
+  keyToPathnames: Map<string, Set<string>>;
   maxSize: number;
 }
 
