@@ -1,52 +1,9 @@
-import { HEADERS } from '@/constants/cache';
+import { cookies } from 'next/headers';
+
+import { COOKIES } from '@/constants/cache';
 import type { ClientCacheMetadata } from '@/types/cache';
 import { isServerEnvironment } from '@/utils/environmentUtils';
 import { logger } from '@/utils/logger';
-
-const decodeFromHeader = (encodedData: string): string | null => {
-  try {
-    return atob(encodedData);
-  } catch (error) {
-    logger.warn('[Cache] Failed to decode client cache metadata header', error);
-    return null;
-  }
-};
-
-const parseClientCacheMetadata = (
-  serializedData: string
-): ClientCacheMetadata[] | null => {
-  try {
-    return JSON.parse(serializedData);
-  } catch (error) {
-    logger.warn('[Cache] Failed to parse client cache metadata', error);
-    return null;
-  }
-};
-
-export const extractClientCacheMetadataFromHeaders = (
-  headers: Headers
-): ClientCacheMetadata[] | null => {
-  if (!isServerEnvironment()) {
-    return null;
-  }
-
-  const headerValue = headers.get(HEADERS.CLIENT_CACHE);
-  if (!headerValue) {
-    return null;
-  }
-
-  const decoded = decodeFromHeader(headerValue);
-  if (!decoded) {
-    return null;
-  }
-
-  const parsed = parseClientCacheMetadata(decoded);
-  if (!parsed) {
-    return null;
-  }
-
-  return parsed;
-};
 
 export const hasClientCacheEntryByCacheKey = (
   clientCacheMetadata: ClientCacheMetadata,
@@ -63,4 +20,29 @@ export const findExactClientCacheMetadata = (
     clientCacheMetadataArr.find(metadata => metadata.cacheKey === cacheKey) ??
     null
   );
+};
+
+export const extractClientCacheMetadataFromCookies = async (): Promise<
+  ClientCacheMetadata[] | null
+> => {
+  if (!isServerEnvironment()) return null;
+  try {
+    const requestCookies = await cookies();
+
+    const encoded = requestCookies.get(COOKIES.NEXUS_CLIENT_CACHE)?.value;
+
+    if (!encoded) return null;
+
+    const decoded = Buffer.from(encoded, 'base64').toString('utf8');
+
+    const parsed = JSON.parse(decoded) as ClientCacheMetadata[];
+
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (e) {
+    logger.warn(
+      '[Cache] Failed to parse client cache metadata from cookies',
+      e
+    );
+    return null;
+  }
 };

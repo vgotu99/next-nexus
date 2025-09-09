@@ -1,10 +1,7 @@
-import { clientCacheStore } from '@/cache/clientCacheStore';
 import {
-  extractClientCacheMetadataFromHeaders,
   findExactClientCacheMetadata,
   hasClientCacheEntryByCacheKey,
 } from '@/cache/serverCacheStateProcessor';
-import { HEADERS } from '@/constants/cache';
 import { ERROR_CODES } from '@/constants/errorCodes';
 import {
   trackCache,
@@ -14,6 +11,7 @@ import {
   trackRequestTimeout,
 } from '@/debug/tracker';
 import { isNexusError } from '@/errors/errorFactory';
+import { incPending, decPending } from '@/scope/requestPendingStore';
 import type { ServerCacheOptions } from '@/types/cache';
 import type { NexusDefinition } from '@/types/definition';
 import type {
@@ -35,14 +33,9 @@ import {
   generateCacheKey,
   generateCacheKeyFromDefinition,
   generateETag,
-  isCacheEntryExpired,
 } from '@/utils/cacheUtils';
-import {
-  isServerEnvironment,
-  isClientEnvironment,
-} from '@/utils/environmentUtils';
+import { isServerEnvironment } from '@/utils/environmentUtils';
 import { executeRequest } from '@/utils/executeRequest';
-import { createNexusResponse } from '@/utils/responseProcessor';
 import { retry } from '@/utils/retry';
 
 import {
@@ -106,16 +99,6 @@ const createInterceptorInterface = (
   },
 });
 
-const getInboundHeaders = async () => {
-  try {
-    const { headers } = await import('next/headers');
-
-    return await headers();
-  } catch (error) {
-    return null;
-  }
-};
-
 const executeRequestWithLifecycle = async <T>(
   url: string,
   config: InternalNexusRequestConfig,
@@ -157,14 +140,17 @@ const executeRequestWithLifecycle = async <T>(
         serverTags: modifiedConfig.server?.tags,
       });
 
-      const inboundHeaders = await getInboundHeaders();
       const responseEtag =
         response.data !== null && response.data !== undefined
           ? generateETag(response.data)
           : undefined;
 
+      const { extractClientCacheMetadataFromCookies } = await import(
+        '@/cache/serverCacheStateProcessor'
+      );
+
       const clientCacheMetadataArr =
-        inboundHeaders && extractClientCacheMetadataFromHeaders(inboundHeaders);
+        await extractClientCacheMetadataFromCookies();
       const exactClientCacheMetadata =
         clientCacheMetadataArr &&
         findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
@@ -174,7 +160,7 @@ const executeRequestWithLifecycle = async <T>(
       const isETagMatched =
         !!responseEtag && exactClientCacheMetadata?.etag === responseEtag;
 
-      const shouldSkipHydration = isClientCacheStale && isETagMatched;
+      const shouldSkipHydration = isETagMatched;
       const shouldHydrate =
         hasNoClientCache || (isClientCacheStale && !isETagMatched);
 
@@ -183,22 +169,22 @@ const executeRequestWithLifecycle = async <T>(
       if (shouldSkipHydration) {
         const existing = await requestScopeStore.get(cacheKey);
 
-        if (!existing) {
+        if (!existing && isClientCacheStale) {
           const { registerNotModifiedKey } = await import(
             '@/scope/notModifiedContext'
           );
 
           registerNotModifiedKey(cacheKey);
-
-          trackCache({
-            type: 'MATCH',
-            key: generateBaseKey({ url, method: modifiedConfig.method }),
-            source: 'server',
-            tags: modifiedConfig.client?.tags,
-            revalidate: modifiedConfig.client?.revalidate,
-            ttl: exactClientCacheMetadata.ttl,
-          });
         }
+
+        trackCache({
+          type: 'MATCH',
+          key: generateBaseKey({ url, method: modifiedConfig.method }),
+          source: 'server',
+          tags: modifiedConfig.client?.tags,
+          revalidate: modifiedConfig.client?.revalidate,
+          ttl: exactClientCacheMetadata.ttl,
+        });
       }
 
       if (shouldHydrate) {
@@ -317,96 +303,67 @@ const executeRequestWithLifecycle = async <T>(
 const globalRequestInterceptor = createRequestInterceptor();
 const globalResponseInterceptor = createResponseInterceptor();
 
-const createResponseFromClientCache = <T>(
-  entry: { data: T },
-  url: string,
-  config: InternalNexusRequestConfig
-): NexusResponse<T> => {
-  const response = new Response(JSON.stringify(entry.data), {
-    status: 200,
-    statusText: 'OK',
-    headers: {
-      'content-type': 'application/json',
-      [HEADERS.CACHE_STATUS]: 'CLIENT_HIT',
-    },
-  });
-
-  const base = createNexusResponse<T>(response, entry.data);
-
-  return {
-    ...base,
-    url,
-    headers: new Headers(response.headers),
-    config,
-    request: new Request(url, config),
-    clone: () => createResponseFromClientCache(entry, url, config),
-  } as NexusResponse<T>;
-};
-
 export const nexus = async <T>(
   definition: NexusDefinition<T>
 ): Promise<NexusResponse<T>> => {
+  incPending();
+
   const { baseURL, endpoint, interceptors, method, client } = definition;
   const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
 
   const cacheKey =
     method === 'GET' && generateCacheKeyFromDefinition(definition);
   const requestConfig = buildRequestConfig(definition);
+
   const hasClientOption = typeof client === 'object';
 
-  if (isClientEnvironment() && cacheKey && hasClientOption) {
-    const entry = clientCacheStore.get<T>(cacheKey);
-
-    if (entry && !isCacheEntryExpired(entry)) {
-      return Promise.resolve(
-        createResponseFromClientCache(entry, url, requestConfig)
-      );
-    }
-  }
-
   if (isServerEnvironment() && cacheKey && hasClientOption) {
-    const inboundHeaders = await getInboundHeaders();
+    const { extractClientCacheMetadataFromCookies } = await import(
+      '@/cache/serverCacheStateProcessor'
+    );
 
-    if (inboundHeaders) {
-      const clientCacheMetadataArr =
-        extractClientCacheMetadataFromHeaders(inboundHeaders);
+    const clientCacheMetadataArr =
+      await extractClientCacheMetadataFromCookies();
+    const exactClientCacheMetadata =
+      clientCacheMetadataArr &&
+      findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
 
-      const exactClientCacheMetadata =
-        clientCacheMetadataArr &&
-        findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
+    const { isDelegationEnabled } = await import('@/scope/renderRegistry');
 
-      const { isDelegationEnabled } = await import('@/scope/renderRegistry');
+    const shouldDelegate =
+      exactClientCacheMetadata !== null &&
+      exactClientCacheMetadata?.ttl > 0 &&
+      isDelegationEnabled() &&
+      hasClientCacheEntryByCacheKey(exactClientCacheMetadata, cacheKey);
 
-      const shouldDelegate =
-        exactClientCacheMetadata !== null &&
-        exactClientCacheMetadata?.ttl > 0 &&
-        isDelegationEnabled() &&
-        hasClientCacheEntryByCacheKey(exactClientCacheMetadata, cacheKey);
+    if (shouldDelegate) {
+      trackCache({
+        type: 'DELEGATE',
+        key: generateBaseKey({ url, method }),
+        source: 'server',
+        tags: definition.client?.tags,
+        revalidate: definition.client?.revalidate,
+        ttl: exactClientCacheMetadata.ttl,
+      });
 
-      if (shouldDelegate) {
-        trackCache({
-          type: 'DELEGATE',
-          key: generateBaseKey({ url, method }),
-          source: 'server',
-          tags: definition.client?.tags,
-          revalidate: definition.client?.revalidate,
-          ttl: exactClientCacheMetadata.ttl,
-        });
+      decPending();
 
-        throw new Promise(() => {});
-      }
+      throw new Promise(() => {});
     }
   }
 
-  const response = await executeRequestWithLifecycle<T>(
-    url,
-    requestConfig,
-    interceptors || [],
-    globalRequestInterceptor,
-    globalResponseInterceptor
-  );
-
-  return response as NexusResponse<T>;
+  try {
+    const response = await executeRequestWithLifecycle<T>(
+      url,
+      requestConfig,
+      interceptors || [],
+      globalRequestInterceptor,
+      globalResponseInterceptor
+    );
+    return response as NexusResponse<T>;
+  } finally {
+    decPending();
+  }
 };
 
 export const interceptors: NexusInterceptors = createInterceptorInterface(

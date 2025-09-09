@@ -1,24 +1,23 @@
+import { cookies } from 'next/headers';
+
+import { COOKIES } from '@/constants/cache';
 import type { NexusProviderProps } from '@/providers/NexusProvider';
 import {
+  enterNotModifiedContext,
   getNotModifiedKeys,
-  runWithNotModifiedContext,
 } from '@/scope/notModifiedContext';
+import { waitForAll, enterPendingStore } from '@/scope/requestPendingStore';
 import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ClientCacheEntry } from '@/types/cache';
-import { NexusPayload } from '@/types/payload';
+import type { NexusPayload } from '@/types/payload';
 import { logger } from '@/utils/logger';
-
-type ServerNexusProviderProps = Omit<NexusProviderProps, 'maxSize'>;
 
 const collectHydrationData = async () => {
   const allCacheKeys = await requestScopeStore.keys();
-
   const hydrationEntries = await Promise.all(
     allCacheKeys.map(async key => {
       const entry = await requestScopeStore.get<ClientCacheEntry>(key);
-
       if (!entry) return null;
-
       return [
         key,
         {
@@ -32,11 +31,9 @@ const collectHydrationData = async () => {
       ] as const;
     })
   );
-
   const validEntries = hydrationEntries.filter(
     (entry): entry is NonNullable<typeof entry> => entry !== null
   );
-
   return Object.fromEntries(validEntries);
 };
 
@@ -49,13 +46,18 @@ const hasPayloadContent = (payload: NexusPayload): boolean => {
 
 const HydrationScript = async () => {
   try {
-    const notModifiedKeys = getNotModifiedKeys();
+    await waitForAll();
 
     const hydrationData = await collectHydrationData();
+    const notModifiedKeys = getNotModifiedKeys();
+
+    const requestCookies = await cookies();
+    const pathname = requestCookies.get(COOKIES.NEXUS_PATHNAME)?.value || '';
 
     const payload: NexusPayload = {
       hydrationData,
       notModifiedKeys,
+      pathname: pathname,
     };
 
     if (!hasPayloadContent(payload)) {
@@ -67,9 +69,8 @@ const HydrationScript = async () => {
     return (
       <script
         id='__NEXUS_SCRIPT__'
-        dangerouslySetInnerHTML={{
-          __html: `window.__NEXUS_PAYLOAD__ = ${serializedPayload};`,
-        }}
+        type='application/json'
+        dangerouslySetInnerHTML={{ __html: serializedPayload }}
       />
     );
   } catch (error) {
@@ -78,14 +79,18 @@ const HydrationScript = async () => {
   }
 };
 
+type ServerNexusProviderProps = Omit<NexusProviderProps, 'maxSize'>;
+
 const ServerNexusProvider = ({ children }: ServerNexusProviderProps) => {
-  return requestScopeStore.runWith(() =>
-    runWithNotModifiedContext(() => (
-      <>
-        {children}
-        <HydrationScript />
-      </>
-    ))
+  enterPendingStore();
+  requestScopeStore.enter();
+  enterNotModifiedContext();
+
+  return (
+    <>
+      <HydrationScript />
+      {children}
+    </>
   );
 };
 
