@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 
-import ClientNexusProvider from '@/providers/ClientNexusProvider';
-import ServerNexusProvider from '@/providers/ServerNexusProvider';
-import { isServerEnvironment } from '@/utils/environmentUtils';
+import { NexusHydrationBoundary } from '@/server/NexusHydrationBoundary';
+import { NexusRscInitializer, NexusHydrator } from 'next-nexus/client';
 
 export interface NexusProviderProps {
   children: ReactNode;
@@ -10,9 +9,11 @@ export interface NexusProviderProps {
 }
 
 export const NexusProvider = ({ children, maxSize }: NexusProviderProps) => {
-  return isServerEnvironment() ? (
-    <ServerNexusProvider>{children}</ServerNexusProvider>
-  ) : (
-    <ClientNexusProvider maxSize={maxSize}>{children}</ClientNexusProvider>
+  return (
+    <>
+      <NexusRscInitializer />
+      <NexusHydrator maxSize={maxSize} />
+      <NexusHydrationBoundary>{children}</NexusHydrationBoundary>
+    </>
   );
 };
