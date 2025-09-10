@@ -11,6 +11,7 @@ import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ClientCacheEntry } from '@/types/cache';
 import type { NexusPayload } from '@/types/payload';
 import { logger } from '@/utils/logger';
+import { NexusHydrationDispatcher } from 'next-nexus/client';
 
 const collectHydrationData = async () => {
   const allCacheKeys = await requestScopeStore.keys();
@@ -57,21 +58,17 @@ const HydrationScript = async () => {
     const payload: NexusPayload = {
       hydrationData,
       notModifiedKeys,
-      pathname: pathname,
+      pathname,
     };
 
     if (!hasPayloadContent(payload)) {
       return null;
     }
 
-    const serializedPayload = JSON.stringify(payload);
-
     return (
-      <script
-        id='__NEXUS_SCRIPT__'
-        type='application/json'
-        dangerouslySetInnerHTML={{ __html: serializedPayload }}
-      />
+      <>
+        <NexusHydrationDispatcher key={payload.pathname} payload={payload} />
+      </>
     );
   } catch (error) {
     logger.warn('[Provider] Failed to generate hydration script', error);
@@ -81,7 +78,9 @@ const HydrationScript = async () => {
 
 type ServerNexusProviderProps = Omit<NexusProviderProps, 'maxSize'>;
 
-const ServerNexusProvider = ({ children }: ServerNexusProviderProps) => {
+export const NexusHydrationBoundary = ({
+  children,
+}: ServerNexusProviderProps) => {
   enterPendingStore();
   requestScopeStore.enter();
   enterNotModifiedContext();
@@ -93,5 +92,3 @@ const ServerNexusProvider = ({ children }: ServerNexusProviderProps) => {
     </>
   );
 };
-
-export default ServerNexusProvider;
