@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
@@ -73,6 +74,7 @@ const queryReducer = <TData>(
 const fetchData = async <TData>(
   definition: GetNexusDefinition<TData>,
   cacheKey: string,
+  pathname: string,
   route?: string
 ): Promise<{ data: TData; headers: Headers }> => {
   const finalDefinition = route
@@ -108,6 +110,8 @@ const fetchData = async <TData>(
     etag,
     headers: cachedResponseHeaders,
   });
+
+  clientCacheStore.indexPathname(pathname, cacheKey);
 
   return { data: response.data, headers: response.headers };
 };
@@ -150,13 +154,20 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     [definition]
   );
 
+  const pathname = usePathname();
+
   const refetch = useCallback(async (): Promise<void> => {
     if (!enabled) return;
 
     dispatch({ type: 'SET_PENDING', payload: true });
 
     try {
-      const { data, headers } = await fetchData(definition, cacheKey, route);
+      const { data, headers } = await fetchData(
+        definition,
+        cacheKey,
+        pathname,
+        route
+      );
       dispatch({ type: 'SET_RESULT', payload: { data, headers } });
     } catch (error) {
       const errorMessage =
@@ -167,7 +178,7 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
         payload: new Error(`useNexusQuery failed: ${errorMessage}`),
       });
     }
-  }, [definition, cacheKey, enabled, route]);
+  }, [definition, cacheKey, enabled, pathname, route]);
 
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
     if (!enabled) return null;
