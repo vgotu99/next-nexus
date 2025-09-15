@@ -1,12 +1,16 @@
 import { cookies } from 'next/headers';
+import { Suspense } from 'react';
 
 import { COOKIES } from '@/constants/cache';
-import type { NexusProviderProps } from '@/providers/NexusProvider';
 import {
   enterNotModifiedContext,
   getNotModifiedKeys,
 } from '@/scope/notModifiedContext';
-import { waitForAll, enterPendingStore } from '@/scope/requestPendingStore';
+import {
+  waitForAll,
+  enterPendingStore,
+  markRenderSettled,
+} from '@/scope/requestPendingStore';
 import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ClientCacheEntry } from '@/types/cache';
 import type { NexusPayload } from '@/types/payload';
@@ -66,29 +70,37 @@ const HydrationScript = async () => {
     }
 
     return (
-      <>
-        <NexusHydrationDispatcher key={payload.pathname} payload={payload} />
-      </>
+      <NexusHydrationDispatcher key={payload.pathname} payload={payload} />
     );
   } catch (error) {
     logger.warn('[Provider] Failed to generate hydration script', error);
+    
     return null;
   }
 };
 
-type ServerNexusProviderProps = Omit<NexusProviderProps, 'maxSize'>;
+const NexusRenderSettled = () => {
+  markRenderSettled();
+
+  return null;
+};
 
 export const NexusHydrationBoundary = ({
   children,
-}: ServerNexusProviderProps) => {
+}: {
+  children: React.ReactNode;
+}) => {
   enterPendingStore();
   requestScopeStore.enter();
   enterNotModifiedContext();
 
   return (
     <>
-      <HydrationScript />
       {children}
+      <Suspense fallback={null}>
+        <NexusRenderSettled />
+        <HydrationScript />
+      </Suspense>
     </>
   );
 };
