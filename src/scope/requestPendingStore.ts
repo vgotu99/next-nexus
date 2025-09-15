@@ -2,9 +2,12 @@ import { AsyncLocalStorage } from 'async_hooks';
 
 interface PendingState {
   count: number;
+  reservations: number;
   started: boolean;
+  renderSettled: boolean;
   waiters: Array<() => void>;
   startedWaiters: Array<() => void>;
+  renderSettledWaiters: Array<() => void>;
 }
 
 const storage = new AsyncLocalStorage<PendingState>();
@@ -16,9 +19,12 @@ const ensureState = (): PendingState => {
 
   const initialState: PendingState = {
     count: 0,
+    reservations: 0,
     started: false,
+    renderSettled: false,
     waiters: [],
     startedWaiters: [],
+    renderSettledWaiters: [],
   };
 
   storage.enterWith(initialState);
@@ -26,93 +32,73 @@ const ensureState = (): PendingState => {
   return initialState;
 };
 
+const flush = (list: Array<() => void>): void => {
+  if (list.length === 0) return;
+
+  const copy = list.slice();
+
+  list.length = 0;
+
+  copy.forEach(fn => fn());
+};
+
 const signalStarted = (store: PendingState): void => {
   if (store.started) return;
 
   store.started = true;
 
-  if (store.startedWaiters.length === 0) return;
-
-  const list = store.startedWaiters;
-
-  store.startedWaiters = [];
-
-  list.forEach(fn => {
-    fn();
-  });
+  flush(store.startedWaiters);
 };
 
-const signalAllDone = (store: PendingState): void => {
-  if (store.count !== 0 || store.waiters.length === 0) return;
+const signalRenderSettled = (store: PendingState): void => {
+  if (store.renderSettled) return;
 
-  const list = store.waiters;
+  store.renderSettled = true;
 
-  store.waiters = [];
+  flush(store.renderSettledWaiters);
 
-  list.forEach(fn => {
-    fn();
-  });
+  if (store.count === 0 && store.reservations === 0) {
+    flush(store.waiters);
+  }
 };
 
-const waitForStart = async (store: PendingState): Promise<void> => {
-  if (store.started) return;
+export const markRenderSettled = (): void => {
+  const store = ensureState();
 
-  const MICRO_YIELD_LIMIT = 2 as const;
-  const MACRO_YIELD_LIMIT = 1 as const;
+  signalRenderSettled(store);
+};
 
-  const raceStartOrMicro = () => {
-    return Promise.race([
-      new Promise<void>(resolve => {
-        if (typeof queueMicrotask === 'function') {
-          queueMicrotask(resolve);
-        } else {
-          Promise.resolve().then(resolve);
-        }
-      }),
-      new Promise<void>(resolve => store.startedWaiters.push(resolve)),
-    ]);
-  };
+const signalMaybeAllClear = (store: PendingState): void => {
+  if (store.count !== 0 || store.reservations !== 0) return;
 
-  const raceStartOrMacro = () => {
-    return Promise.race([
-      new Promise<void>(resolve => setTimeout(resolve, 0)),
-      new Promise<void>(resolve => store.startedWaiters.push(resolve)),
-    ]);
-  };
+  if (!store.renderSettled) return;
 
-  const spinMicro = async (remaining: number): Promise<void> => {
-    if (store.started || remaining <= 0) return;
-
-    await raceStartOrMicro();
-
-    if (store.started) return;
-
-    return spinMicro(remaining - 1);
-  };
-
-  await spinMicro(MICRO_YIELD_LIMIT);
-
-  if (store.started) return;
-
-  const spinMacro = async (remaining: number): Promise<void> => {
-    if (store.started || remaining <= 0) return;
-
-    await raceStartOrMacro();
-  };
-
-  await spinMacro(MACRO_YIELD_LIMIT);
+  flush(store.waiters);
 };
 
 export const enterPendingStore = (): void => {
   ensureState();
 };
 
-export const runWithPendingStore = async <T>(
-  callback: () => Promise<T> | T
-): Promise<T> => {
-  ensureState();
+export const reservePending = (): void => {
+  const store = ensureState();
 
-  return callback();
+  const wasZero = store.reservations === 0;
+  store.reservations += 1;
+
+  if (!store.started && wasZero) {
+    flush(store.startedWaiters);
+  }
+};
+
+export const releaseReservation = (): void => {
+  const store = storage.getStore();
+
+  if (!store) return;
+
+  store.reservations = Math.max(0, store.reservations - 1);
+
+  signalMaybeAllClear(store);
 };
 
 export const incPending = (): void => {
@@ -121,6 +107,8 @@ export const incPending = (): void => {
   signalStarted(store);
 
   store.count += 1;
+
+  if (store.reservations > 0) store.reservations -= 1;
 };
 
 export const decPending = (): void => {
@@ -130,7 +118,26 @@ export const decPending = (): void => {
 
   store.count = Math.max(0, store.count - 1);
 
-  signalAllDone(store);
+  signalMaybeAllClear(store);
+};
+
+const waitForStartOrSettled = async (store: PendingState): Promise<void> => {
+  if (store.started || store.reservations > 0 || store.renderSettled) return;
+
+  await new Promise<void>(resolve => {
+    let called = false;
+
+    const once = () => {
+      if (called) return;
+
+      called = true;
+
+      resolve();
+    };
+
+    store.startedWaiters.push(once);
+    store.renderSettledWaiters.push(once);
+  });
 };
 
 export const waitForAll = async (): Promise<void> => {
@@ -138,10 +145,10 @@ export const waitForAll = async (): Promise<void> => {
 
   if (!store) return;
 
-  await waitForStart(store);
+  await waitForStartOrSettled(store);
 
-  if (!store.started) return;
-  if (store.count === 0) return;
+  if (store.renderSettled && store.count === 0 && store.reservations === 0)
+    return;
 
   await new Promise<void>(resolve => {
     store.waiters.push(resolve);
