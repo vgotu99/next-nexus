@@ -8,6 +8,10 @@ import {
   SingleDefinitionServerRenderer,
   GroupDefinitionsServerRenderer,
 } from '@/components/ServerRenderer';
+import {
+  reservePending,
+  releaseReservation,
+} from '@/scope/requestPendingStore';
 import { nexus } from '@/server';
 import type { NexusDefinition } from '@/types/definition';
 import { generateCacheKeyFromDefinition } from '@/utils/cacheUtils';
@@ -86,6 +90,8 @@ const SingleDefinitionRenderer = async <
     );
   }
 
+  releaseReservation();
+
   return (
     <SingleDefinitionClientRenderer
       definition={props.definition}
@@ -148,6 +154,8 @@ const GroupDefinitionsRenderer = async <
     }
   }
 
+  releaseReservation();
+
   return (
     <GroupDefinitionsClientRenderer
       definitions={props.definitions}
@@ -161,6 +169,8 @@ export const NexusRenderer = <D, P extends object = Record<string, unknown>>(
   props: NexusRendererSingleProps<D, P> | NexusRendererGroupProps<D, P>
 ): ReactElement => {
   const isGroup = 'definitions' in props;
+
+  reservePending();
 
   if (isGroup) {
     return (
