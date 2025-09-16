@@ -1,7 +1,4 @@
-import {
-  findExactClientCacheMetadata,
-  hasClientCacheEntryByCacheKey,
-} from '@/cache/serverCacheStateProcessor';
+import { findExactClientCacheMetadata } from '@/cache/serverCacheStateProcessor';
 import { ERROR_CODES } from '@/constants/errorCodes';
 import {
   trackCache,
@@ -31,7 +28,6 @@ import {
 import {
   generateBaseKey,
   generateCacheKey,
-  generateCacheKeyFromDefinition,
   generateETag,
 } from '@/utils/cacheUtils';
 import { isServerEnvironment } from '@/utils/environmentUtils';
@@ -308,49 +304,9 @@ export const nexus = async <T>(
 ): Promise<NexusResponse<T>> => {
   incPending();
 
-  const { baseURL, endpoint, interceptors, method, client } = definition;
+  const { baseURL, endpoint, interceptors } = definition;
   const url = baseURL ? `${baseURL}${endpoint}` : endpoint;
-
-  const cacheKey =
-    method === 'GET' && generateCacheKeyFromDefinition(definition);
   const requestConfig = buildRequestConfig(definition);
-
-  const hasClientOption = typeof client === 'object';
-
-  if (isServerEnvironment() && cacheKey && hasClientOption) {
-    const { extractClientCacheMetadataFromCookies } = await import(
-      '@/cache/serverCacheStateProcessor'
-    );
-
-    const clientCacheMetadataArr =
-      await extractClientCacheMetadataFromCookies();
-    const exactClientCacheMetadata =
-      clientCacheMetadataArr &&
-      findExactClientCacheMetadata(clientCacheMetadataArr, cacheKey);
-
-    const { isDelegationEnabled } = await import('@/scope/renderRegistry');
-
-    const shouldDelegate =
-      exactClientCacheMetadata !== null &&
-      exactClientCacheMetadata?.ttl > 0 &&
-      isDelegationEnabled() &&
-      hasClientCacheEntryByCacheKey(exactClientCacheMetadata, cacheKey);
-
-    if (shouldDelegate) {
-      trackCache({
-        type: 'DELEGATE',
-        key: generateBaseKey({ url, method }),
-        source: 'server',
-        tags: definition.client?.tags,
-        revalidate: definition.client?.revalidate,
-        ttl: exactClientCacheMetadata.ttl,
-      });
-
-      decPending();
-
-      throw new Promise(() => {});
-    }
-  }
 
   try {
     const response = await executeRequestWithLifecycle<T>(
