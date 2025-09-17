@@ -8,11 +8,11 @@ import {
 import { isGetDefinition } from '@/utils/definitionUtils';
 import { logger } from '@/utils/logger';
 
-const validateGetDefinition = (
-  definition: NexusDefinition<unknown>
-): void => {
+const validateGetDefinition = (definition: NexusDefinition<unknown>): void => {
   if (!isGetDefinition(definition)) {
-    logger.warn('[Cache] nexusCache is primarily designed for GET requests. Using it with mutation definitions may not work as expected.');
+    logger.warn(
+      '[Cache] nexusCache is primarily designed for GET requests. Using it with mutation definitions may not work as expected.'
+    );
   }
 };
 
@@ -38,13 +38,7 @@ const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
   };
 
   const invalidateEntry = (): void => {
-    const entry = clientCacheStore.get<TData>(cacheKey);
-    if (!entry) return;
-
-    clientCacheStore.update(cacheKey, {
-      expiresAt: 0,
-      source: 'manual' as const,
-    });
+    clientCacheStore.invalidate(cacheKey);
   };
 
   const checkStaleStatus = (): boolean => {

@@ -366,11 +366,12 @@ const size = (): number => {
   return clientCacheState.clientCache.size;
 };
 
-const revalidateByTags = (tags: string[]): void => {
-  if (!isClientEnvironment() || !tags.length) return;
+const invalidate = (key: string) => {
+  const hasEntry = clientCacheState.clientCache.has(key);
 
-  const keysToDelete = getKeysByTags(tags);
-  keysToDelete.forEach(key => deleteKey(key));
+  if (!hasEntry) return;
+
+  update(key, { expiresAt: 0, source: 'manual' });
 };
 
 const getMaxSize = () => {
@@ -390,7 +391,8 @@ export const clientCacheStore = {
   update,
   delete: deleteKey,
   size,
-  revalidateByTags,
+  invalidate,
+  getKeysByTags,
   getMaxSize,
   subscribe,
   setMaxSize,
