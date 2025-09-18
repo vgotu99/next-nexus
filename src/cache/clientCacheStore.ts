@@ -22,22 +22,39 @@ const listeners = new Map<
   Set<(entry: ClientCacheEntry | null) => void>
 >();
 
-const notify = (cacheKey: string, entry: ClientCacheEntry | null): void => {
-  const keyListeners = listeners.get(cacheKey);
-  if (!keyListeners) return;
+const pending = new Map<string, ClientCacheEntry | null>();
 
-  keyListeners.forEach(callback => {
-    try {
-      callback(entry);
-    } catch (error) {
-      logger.error(`[Core] Error in cache listener:`, error);
-    }
+const flush = (): void => {
+  const batch = Array.from(pending.entries());
+  pending.clear();
+
+  batch.forEach(([cacheKey, entry]) => {
+    const keyListeners = listeners.get(cacheKey);
+    if (!keyListeners || keyListeners.size === 0) return;
+
+    Array.from(keyListeners).forEach(callback => {
+      try {
+        callback(entry);
+      } catch (error) {
+        logger.error(`[Core] Error in cache listener:`, error);
+      }
+    });
   });
 };
 
-const subscribe = <T = unknown>(
+const notify = (cacheKey: string, entry: ClientCacheEntry | null): void => {
+  const shouldSchedule = pending.size === 0;
+
+  pending.set(cacheKey, entry);
+
+  if (shouldSchedule) {
+    queueMicrotask(flush);
+  }
+};
+
+const subscribe = (
   cacheKey: string,
-  callback: (entry: ClientCacheEntry<T> | null) => void
+  callback: (entry: ClientCacheEntry | null) => void
 ): (() => void) => {
   if (!isClientEnvironment()) return () => {};
 
@@ -46,13 +63,13 @@ const subscribe = <T = unknown>(
   }
 
   const keyListeners = listeners.get(cacheKey)!;
-  keyListeners.add(callback as (entry: ClientCacheEntry | null) => void);
+  keyListeners.add(callback);
 
   return () => {
     const keyListeners = listeners.get(cacheKey);
     if (!keyListeners) return;
 
-    keyListeners.delete(callback as (entry: ClientCacheEntry | null) => void);
+    keyListeners.delete(callback);
 
     if (keyListeners.size === 0) {
       listeners.delete(cacheKey);
