@@ -8,6 +8,7 @@ type AllowedRequestInit = Pick<
   | 'referrer'
   | 'referrerPolicy'
   | 'integrity'
+  | 'signal'
 >;
 
 interface RetryOptions {

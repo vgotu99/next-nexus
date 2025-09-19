@@ -1,5 +1,8 @@
 import { isNexusError } from '@/errors/errorFactory';
-import type { InternalNexusResponse } from '@/types/internal';
+import type {
+  InternalNexusRequestConfig,
+  InternalNexusResponse,
+} from '@/types/internal';
 
 import {
   validateUrl,
@@ -8,36 +11,41 @@ import {
 } from './httpErrorFactory';
 import { processResponse } from './processResponse';
 
-const performFetch = async (request: Request): Promise<Response> => {
-  return await fetch(request);
-};
-
 const handleErrorResponse = async (
   response: Response,
-  request: Request
+  url: string,
+  init: InternalNexusRequestConfig
 ): Promise<never> => {
-  const errorData = await response.clone().json();
-  throw createHttpError(response.status, response, request, errorData);
+  const raw = await response
+    .clone()
+    .text()
+    .catch(() => '');
+  const errorData = raw ? JSON.parse(raw) : {};
+  const req = new Request(url, init);
+  
+  throw createHttpError(response.status, response, req, errorData);
 };
 
 export const executeRequest = async <T>(
-  request: Request
+  url: string,
+  init: InternalNexusRequestConfig
 ): Promise<InternalNexusResponse<T | undefined>> => {
   try {
-    validateUrl(request.url);
+    validateUrl(url);
 
-    const response = await performFetch(request);
+    const response = await fetch(url, init);
 
     if (!response.ok) {
-      await handleErrorResponse(response, request);
+      await handleErrorResponse(response, url, init);
     }
 
-    return processResponse<T>(response, request.method);
+    return processResponse<T>(response, init.method || 'GET');
   } catch (error) {
     if (isNexusError(error)) {
       throw error;
     }
 
-    throw createNetworkError(error, request);
+    const req = new Request(url, init);
+    throw createNetworkError(error, req);
   }
 };

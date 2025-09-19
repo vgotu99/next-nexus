@@ -67,7 +67,6 @@ const buildRequestConfig = (
     cache: server?.cache ? server.cache : 'no-store',
     next,
     body: data ? JSON.stringify(data) : undefined,
-    server,
   };
 };
 
@@ -114,9 +113,12 @@ const executeRequestWithLifecycle = async <T>(
   try {
     const response = await retry({
       attempt: ({ signal }) => {
-        const attemptConfig = { ...modifiedConfig, signal };
-        const request = new Request(url, attemptConfig);
-        return executeRequest<T>(request);
+        const attemptConfig: InternalNexusRequestConfig = {
+          ...modifiedConfig,
+          signal,
+        };
+
+        return executeRequest<T>(url, attemptConfig);
       },
       maxAttempts: (modifiedConfig.retry?.count ?? 0) + 1,
       delaySeconds: modifiedConfig.retry?.delay ?? 1,
@@ -133,7 +135,7 @@ const executeRequestWithLifecycle = async <T>(
         url,
         method: modifiedConfig.method,
         clientTags: modifiedConfig.client?.tags,
-        serverTags: modifiedConfig.server?.tags,
+        serverTags: modifiedConfig.next?.tags,
       });
 
       const responseEtag =
@@ -201,7 +203,7 @@ const executeRequestWithLifecycle = async <T>(
           key: cacheKey,
           clientRevalidate: modifiedConfig.client?.revalidate || 0,
           clientTags: modifiedConfig.client?.tags || [],
-          serverTags: modifiedConfig.server?.tags || [],
+          serverTags: modifiedConfig.next?.tags || [],
           etag: responseEtag,
           headers: cachedResponseHeaders,
         };
