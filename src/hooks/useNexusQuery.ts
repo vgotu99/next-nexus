@@ -183,7 +183,7 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
     if (!enabled) return null;
 
-    const cachedEntry = clientCacheStore.get<TData>(cacheKey);
+    const cachedEntry = clientCacheStore.getWithTracking<TData>(cacheKey);
 
     if (cachedEntry) {
       dispatch({

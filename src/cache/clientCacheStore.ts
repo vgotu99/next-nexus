@@ -251,24 +251,41 @@ const setClientCache = <T = unknown>(
   notify(key, entry);
 };
 
-const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
+const readEntry = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
   if (!isClientEnvironment()) return null;
 
   const entry = clientCacheState.clientCache.get(key) as
     | ClientCacheEntry<T>
     | undefined;
+
+  if (!entry) return null;
+
+  touchCacheEntry(key, entry);
+
+  return entry;
+};
+
+const get = <T = unknown>(key: string): ClientCacheEntry<T> | null => {
+  return readEntry<T>(key);
+};
+
+const getWithTracking = <T = unknown>(
+  key: string
+): ClientCacheEntry<T> | null => {
+  if (!isClientEnvironment()) return null;
+
+  const entry = readEntry<T>(key);
+
   if (!entry) {
     trackCache({
       type: 'MISS',
       key,
-      source: 'client-fetch',
       size: clientCacheState.clientCache.size,
       maxSize: clientCacheState.maxSize,
     });
+
     return null;
   }
-
-  touchCacheEntry(key, entry);
 
   trackCache({
     type: 'HIT',
@@ -404,6 +421,7 @@ const setMaxSize = (newSize: number): void => {
 
 export const clientCacheStore = {
   get,
+  getWithTracking,
   set,
   update,
   delete: deleteKey,

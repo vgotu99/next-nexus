@@ -18,7 +18,8 @@ const validateGetDefinition = (definition: NexusDefinition<unknown>): void => {
 
 const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
   const getData = (): TData | undefined => {
-    const entry = clientCacheStore.get<TData>(cacheKey);
+    const entry = clientCacheStore.getWithTracking<TData>(cacheKey);
+
     return entry?.data;
   };
 
@@ -26,7 +27,11 @@ const createCacheHandler = <TData>(cacheKey: string): CacheHandler<TData> => {
     updater: (oldData: TData | undefined) => TData
   ): void => {
     const entry = clientCacheStore.get<TData>(cacheKey);
-    if (!entry) return;
+
+    if (!entry)
+      throw new Error(
+        '[Cache] nexusCache: Cannot update entry that does not exist'
+      );
 
     const newData = updater(entry.data);
     const updatedEntry = {

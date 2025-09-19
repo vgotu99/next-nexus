@@ -33,7 +33,7 @@ export interface CacheEvent {
   type: CacheEventType;
   key: string;
   timestamp: number;
-  source: CacheSource;
+  source?: CacheSource;
   duration?: number;
   status?: number;
   tags?: string[];
