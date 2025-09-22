@@ -2,8 +2,8 @@ export interface UseNexusQueryOptions<TData = unknown, TSelectedData = TData> {
   route?: string;
   enabled?: boolean;
   select?: (data: TData) => TSelectedData;
-  refetchOnWindowFocus?: boolean;
-  refetchOnMount?: boolean;
+  revalidateOnWindowFocus?: boolean;
+  revalidateOnMount?: boolean;
 }
 
 export interface UseNexusQueryResult<TSelectedData = unknown> {
@@ -11,14 +11,16 @@ export interface UseNexusQueryResult<TSelectedData = unknown> {
   headers: Headers | undefined;
   error: Error | null;
   isPending: boolean;
+  isPendingBackground: boolean;
   isSuccess: boolean;
   isError: boolean;
-  refetch: () => Promise<void>;
+  revalidate: () => Promise<void>;
+  refetch: (mode?: 'foreground' | 'background') => Promise<void>;
 }
 
 export type NexusQueryState<TSelectedData = unknown> = Omit<
   UseNexusQueryResult<TSelectedData>,
-  'refetch'
+  'refetch' | 'revalidate'
 >;
 
 export interface UseNexusMutationOptions<
