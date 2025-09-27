@@ -1,29 +1,44 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useCallback, useMemo, useReducer, useEffect } from 'react';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { nexusClient } from '@/core/nexus.client';
+import { executeQueryOnce } from '@/hooks/core/queryExecute';
+import { validateQueryDefinition } from '@/hooks/core/queryValidator';
+import {
+  useQueryOnMount,
+  useQueryOnWindowFocus,
+} from '@/hooks/core/useQueryEvent';
+import { useStableSelect } from '@/hooks/core/useStableSelect';
 import type { ClientCacheEntry } from '@/types/cache';
-import type { GetNexusDefinition, NexusDefinition } from '@/types/definition';
+import type { NexusDefinition } from '@/types/definition';
 import type {
   NexusQueryState,
+  QueryRefetchMode,
   UseNexusQueryOptions,
   UseNexusQueryResult,
 } from '@/types/hooks';
 import {
   generateCacheKeyFromDefinition,
   isCacheEntryExpired,
-  generateETag,
 } from '@/utils/cacheUtils';
-import { isGetDefinition } from '@/utils/definitionUtils';
 
 type QueryAction<TData> =
   | { type: 'SET_RESULT'; payload: { data: TData; headers: Headers } }
   | { type: 'SET_ERROR'; payload: Error }
-  | { type: 'START_FETCH'; payload: { mode: 'foreground' | 'background' } }
+  | { type: 'START_FETCH'; payload: { mode: QueryRefetchMode } }
   | { type: 'RESET' };
+
+const initialState = {
+  data: undefined,
+  headers: undefined,
+  error: null,
+  isPending: false,
+  isPendingBackground: false,
+  isSuccess: false,
+  isError: false,
+};
 
 const queryReducer = <TData>(
   state: NexusQueryState<TData>,
@@ -54,6 +69,7 @@ const queryReducer = <TData>(
       };
     case 'START_FETCH': {
       const isForeGround = action.payload.mode === 'foreground';
+
       return {
         ...state,
         isPending: isForeGround,
@@ -63,150 +79,53 @@ const queryReducer = <TData>(
       };
     }
     case 'RESET':
-      return {
-        data: undefined,
-        headers: undefined,
-        error: null,
-        isPending: false,
-        isPendingBackground: false,
-        isSuccess: false,
-        isError: false,
-      };
+      return initialState;
     default:
       return state;
   }
-};
-
-const fetchData = async <TData>(
-  definition: GetNexusDefinition<TData>,
-  cacheKey: string,
-  pathname: string,
-  route?: string
-): Promise<{ data: TData; headers: Headers }> => {
-  const finalDefinition = route
-    ? { ...definition, baseURL: '', endpoint: route }
-    : definition;
-
-  const response = await nexusClient({
-    ...finalDefinition,
-    client: undefined,
-  } as typeof definition);
-
-  const etag =
-    response.data !== null && response.data !== undefined
-      ? generateETag(response.data)
-      : undefined;
-
-  const cachedResponseHeaders = definition.client?.cachedHeaders?.reduce<
-    Record<string, string>
-  >((acc, headerName) => {
-    const headerValue = response.headers.get(headerName);
-    if (headerValue !== null) {
-      acc[headerName] = headerValue;
-    }
-    return acc;
-  }, {});
-
-  clientCacheStore.set(cacheKey, {
-    data: response.data,
-    clientRevalidate: definition.client?.revalidate,
-    clientTags: definition.client?.tags,
-    serverTags: definition.server?.tags,
-    source: 'fetch',
-    etag,
-    headers: cachedResponseHeaders,
-  });
-
-  clientCacheStore.indexPathname(pathname, cacheKey);
-
-  return { data: response.data, headers: response.headers };
-};
-
-const createInflightMap = <T>() => {
-  const inflight = new Map<string, Promise<{ data: T; headers: Headers }>>();
-
-  return inflight;
 };
 
 export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
   definition: NexusDefinition<TData>,
   options: UseNexusQueryOptions<TData, TSelectedData> = {}
 ): UseNexusQueryResult<TSelectedData> => {
-  if (!definition) {
-    throw new Error('useNexusQuery: definition is required');
-  }
-  if (!isGetDefinition(definition)) {
-    throw new Error('useNexusQuery only accepts GET definitions');
-  }
-  if (typeof definition.endpoint !== 'string' || !definition.endpoint) {
-    throw new Error(
-      'useNexusQuery: definition.endpoint must be a non-empty string'
-    );
-  }
-
   const {
     route,
     enabled = true,
     select,
     revalidateOnWindowFocus = true,
     revalidateOnMount = true,
+    staleOnMount = 'show',
   } = options;
 
-  const [state, dispatch] = useReducer(queryReducer<TData>, {
-    data: undefined,
-    headers: undefined,
-    error: null,
-    isPending: false,
-    isPendingBackground: false,
-    isSuccess: false,
-    isError: false,
-  });
+  const [state, dispatch] = useReducer(queryReducer<TData>, initialState);
 
-  const cacheKey = useMemo(
-    () => generateCacheKeyFromDefinition(definition),
-    [definition]
-  );
+  const cacheKey = useMemo(() => {
+    const validDefinition = validateQueryDefinition(
+      definition,
+      'useNexusQuery'
+    );
+
+    return generateCacheKeyFromDefinition(validDefinition);
+  }, [definition]);
 
   const pathname = usePathname();
 
-  const createFetchPromise = useCallback(
-    (inflight: Map<string, Promise<{ data: TData; headers: Headers }>>) => {
-      const created = (async () => {
-        try {
-          return await fetchData<TData>(
-            definition as GetNexusDefinition<TData>,
-            cacheKey,
-            pathname,
-            route
-          );
-        } finally {
-          inflight.delete(cacheKey);
-        }
-      })();
-
-      inflight.set(cacheKey, created);
-      return created;
-    },
-    [cacheKey, definition, pathname, route]
-  );
-
   const runFetch = useCallback(
-    async (mode: 'foreground' | 'background'): Promise<void> => {
-      const inflight = createInflightMap<TData>();
-
-      const existing = inflight.get(cacheKey);
-
-      const promise: Promise<{ data: TData; headers: Headers }> = existing
-        ? existing
-        : createFetchPromise(inflight);
-
+    async (mode: QueryRefetchMode): Promise<void> => {
       dispatch({ type: 'START_FETCH', payload: { mode } });
 
       try {
-        const { data, headers } = await promise;
+        const { data, headers } = await executeQueryOnce<TData>(
+          cacheKey,
+          definition,
+          pathname,
+          route
+        );
+
         dispatch({
           type: 'SET_RESULT',
-          payload: { data: data, headers },
+          payload: { data, headers },
         });
       } catch (error) {
         const errorMessage =
@@ -217,27 +136,16 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
         });
       }
     },
-    [cacheKey, createFetchPromise]
+    [cacheKey, definition, pathname, route]
   );
 
-  const getModeByCachedEntry = useCallback((): 'foreground' | 'background' => {
-    const cachedEntry = clientCacheStore.get<TData>(cacheKey);
+  const getModeByCachedEntry = useCallback((): QueryRefetchMode => {
+    const hasEntry = clientCacheStore.has(cacheKey);
 
-    return cachedEntry ? 'background' : 'foreground';
+    return hasEntry ? 'background' : 'foreground';
   }, [cacheKey]);
 
-  const refetch = useCallback(
-    async (mode?: 'foreground' | 'background'): Promise<void> => {
-      const finalMode = mode ? mode : getModeByCachedEntry();
-
-      await runFetch(finalMode);
-    },
-    [runFetch, getModeByCachedEntry]
-  );
-
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
-    if (!enabled) return null;
-
     const cachedEntry = clientCacheStore.getWithTracking<TData>(cacheKey);
 
     if (cachedEntry) {
@@ -253,7 +161,17 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     }
 
     return cachedEntry;
-  }, [cacheKey, enabled]);
+  }, [cacheKey]);
+
+  const refetch = useCallback(
+    async (mode?: QueryRefetchMode): Promise<void> => {
+      const modeByCacheEntry = getModeByCachedEntry();
+      const finalMode = mode ?? modeByCacheEntry;
+
+      await runFetch(finalMode);
+    },
+    [runFetch, getModeByCachedEntry]
+  );
 
   const revalidate = useCallback(async (): Promise<void> => {
     const cachedEntry = clientCacheStore.get<TData>(cacheKey);
@@ -263,76 +181,71 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     if (!isCacheEntryExpired(cachedEntry)) return;
 
     await runFetch('background');
-  }, [cacheKey, runFetch]);
+  }, [runFetch, cacheKey]);
 
   const initializeQuery = useCallback(
-    (shouldRevalidateOnMount: boolean): void => {
-      if (!enabled) return;
+    (shouldRevalidate: boolean, isMount: boolean): void => {
+      const cached = clientCacheStore.getWithTracking<TData>(cacheKey);
 
-      const cachedEntry = syncStateWithCache();
-
-      if (!cachedEntry) {
-        refetch('foreground');
+      if (!cached) {
+        if (enabled) void refetch('foreground');
+        else dispatch({ type: 'RESET' });
         return;
       }
 
-      if (shouldRevalidateOnMount && isCacheEntryExpired(cachedEntry)) {
-        void revalidate();
+      const stale = isCacheEntryExpired(cached);
+      const shouldShow = !stale || !isMount || staleOnMount === 'show';
+
+      if (shouldShow) {
+        dispatch({
+          type: 'SET_RESULT',
+          payload: {
+            data: cached.data,
+            headers: new Headers(cached.headers || {}),
+          },
+        });
+      } else {
+        dispatch({ type: 'RESET' });
       }
+
+      if (enabled && shouldRevalidate) void revalidate();
     },
-    [enabled, refetch, revalidate, syncStateWithCache]
+    [cacheKey, enabled, refetch, revalidate, staleOnMount]
   );
 
+  useQueryOnMount(() => {
+    initializeQuery(revalidateOnMount, true);
+  });
+
+  useQueryOnWindowFocus(() => {
+    initializeQuery(revalidateOnWindowFocus, false);
+  });
+
   useEffect(() => {
-    if (!enabled) {
-      dispatch({ type: 'RESET' });
-      return;
-    }
-
-    initializeQuery(revalidateOnMount);
-  }, [enabled, revalidateOnMount, initializeQuery]);
-
-  useEffect(() => {
-    if (!enabled) return;
-
     const unsubscribe = clientCacheStore.subscribe(
       cacheKey,
       syncStateWithCache
     );
 
     return unsubscribe;
-  }, [cacheKey, enabled, syncStateWithCache]);
+  }, [cacheKey, syncStateWithCache]);
 
-  useEffect(() => {
-    if (!enabled || !revalidateOnWindowFocus) return;
+  const selectedData = useStableSelect<TData, TSelectedData>(
+    state.data,
+    select
+  );
 
-    const handleWindowFocus = () => {
-      void revalidate();
-    };
-
-    window.addEventListener('focus', handleWindowFocus);
-    return () => window.removeEventListener('focus', handleWindowFocus);
-  }, [enabled, revalidateOnWindowFocus, revalidate]);
-
-  const selectedData = useMemo(() => {
-    if (state.data === undefined) return undefined as unknown as TSelectedData;
-    return select
-      ? select(state.data)
-      : (state.data as unknown as TSelectedData);
-  }, [state.data, select]);
-
-  const derivedIsPending =
-    (!enabled && state.data === undefined) || state.isPending;
+  const isPending = state.isPending;
 
   return {
     data: selectedData,
     headers: state.headers,
     error: state.error,
-    isPending: !!derivedIsPending,
+    isPending,
     isPendingBackground: state.isPendingBackground,
     isSuccess: state.isSuccess,
     isError: state.isError,
     revalidate,
     refetch,
-  } as UseNexusQueryResult<TSelectedData>;
+  };
 };
