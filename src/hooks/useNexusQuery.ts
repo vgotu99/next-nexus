@@ -95,7 +95,7 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     select,
     revalidateOnWindowFocus = true,
     revalidateOnMount = true,
-    staleOnMount = 'show',
+    keepStaleData = true,
   } = options;
 
   const [state, dispatch] = useReducer(queryReducer<TData>, initialState);
@@ -148,7 +148,15 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
     const cachedEntry = clientCacheStore.getWithTracking<TData>(cacheKey);
 
-    if (cachedEntry) {
+    if (!cachedEntry) {
+      dispatch({ type: 'RESET' });
+
+      return null;
+    }
+
+    const isExpired = isCacheEntryExpired(cachedEntry);
+
+    if (!isExpired || keepStaleData) {
       dispatch({
         type: 'SET_RESULT',
         payload: {
@@ -158,10 +166,12 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
       });
     } else {
       dispatch({ type: 'RESET' });
+
+      return null;
     }
 
     return cachedEntry;
-  }, [cacheKey]);
+  }, [cacheKey, keepStaleData]);
 
   const refetch = useCallback(
     async (mode?: QueryRefetchMode): Promise<void> => {
@@ -184,41 +194,28 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
   }, [runFetch, cacheKey]);
 
   const initializeQuery = useCallback(
-    (shouldRevalidate: boolean, isMount: boolean): void => {
-      const cached = clientCacheStore.getWithTracking<TData>(cacheKey);
+    (shouldRevalidate: boolean): void => {
+      const cachedEntry = syncStateWithCache();
 
-      if (!cached) {
-        if (enabled) void refetch('foreground');
-        else dispatch({ type: 'RESET' });
+      if (!enabled) return;
+
+      if (!cachedEntry) {
+        void runFetch('foreground');
+
         return;
       }
 
-      const stale = isCacheEntryExpired(cached);
-      const shouldShow = !stale || !isMount || staleOnMount === 'show';
-
-      if (shouldShow) {
-        dispatch({
-          type: 'SET_RESULT',
-          payload: {
-            data: cached.data,
-            headers: new Headers(cached.headers || {}),
-          },
-        });
-      } else {
-        dispatch({ type: 'RESET' });
-      }
-
-      if (enabled && shouldRevalidate) void revalidate();
+      if (shouldRevalidate) void runFetch('background');
     },
-    [cacheKey, enabled, refetch, revalidate, staleOnMount]
+    [enabled, runFetch, syncStateWithCache]
   );
 
   useQueryOnMount(() => {
-    initializeQuery(revalidateOnMount, true);
+    initializeQuery(revalidateOnMount);
   });
 
   useQueryOnWindowFocus(() => {
-    initializeQuery(revalidateOnWindowFocus, false);
+    initializeQuery(revalidateOnWindowFocus);
   });
 
   useEffect(() => {

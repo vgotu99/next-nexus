@@ -6,7 +6,7 @@ export interface UseNexusQueryOptions<TData = unknown, TSelectedData = TData> {
   select?: (data: TData) => TSelectedData;
   revalidateOnWindowFocus?: boolean;
   revalidateOnMount?: boolean;
-  staleOnMount?: 'show' | 'hide';
+  keepStaleData?: boolean;
 }
 
 export interface UseNexusQueryResult<TSelectedData = unknown> {
