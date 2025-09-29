@@ -26,6 +26,43 @@ export type NexusQueryState<TSelectedData = unknown> = Omit<
   'refetch' | 'revalidate'
 >;
 
+export type UseNexusInfiniteQueryOptions<
+  TPage,
+  TParam,
+  TSelected = TPage,
+> = UseNexusQueryOptions<TPage, TSelected> & {
+  initialPageParam: TParam;
+  getNextPageParam: (lastPage: TPage, pages: TPage[]) => TParam | null;
+  prefetchNextOnNearViewport?: {
+    rootMargin?: string;
+    threshold?: number;
+    strategy?: 'revalidate' | 'refetch';
+    mode?: QueryRefetchMode;
+  };
+  keepPages?: number;
+};
+
+export type UseNexusInfiniteQueryResult<
+  TSelected = unknown,
+  TParam = unknown,
+> = Omit<
+  UseNexusQueryResult<{ pages: TSelected[]; pageParams: TParam[] }>,
+  'refetch' | 'revalidate'
+> & {
+  hasNextPage: boolean;
+  revalidateNext: () => Promise<void>;
+  refetchNext: (mode?: QueryRefetchMode) => Promise<void>;
+  prefetchRef?: (el: Element | null) => void;
+};
+
+export type NexusInfiniteQueryState<TPage = unknown, TParam = unknown> = Pick<
+  UseNexusInfiniteQueryResult<TPage, TParam>,
+  'data' | 'headers' | 'error' | 'isSuccess' | 'isError'
+> & {
+  pendingCount: number;
+  pendingBackgroundCount: number;
+};
+
 export interface UseNexusMutationOptions<
   TContext = unknown,
   TError = Error,
