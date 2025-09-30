@@ -206,16 +206,11 @@ export const useNexusInfiniteQuery = <
   const pathname = usePathname();
 
   const runFetch = useCallback(
-    async (
-      param: TParam,
-      mode: QueryRefetchMode,
-      replaceIndex?: number
-    ): Promise<void> => {
+    async (param: TParam, mode: QueryRefetchMode): Promise<void> => {
       const cacheKey = makeCacheKey(param);
 
       dispatch({ type: 'START_FETCH', payload: { mode } });
 
-      dispatch({ type: 'SET_ERROR', payload: null });
       try {
         const { data, headers } = await executeQueryOnce<TPage>(
           cacheKey,
@@ -224,10 +219,14 @@ export const useNexusInfiniteQuery = <
           route
         );
 
-        if (typeof replaceIndex === 'number') {
+        const existingIndex = (state.data?.pageParams ?? []).findIndex(
+          p => makeCacheKey(p) === cacheKey
+        );
+
+        if (existingIndex >= 0) {
           dispatch({
             type: 'REPLACE',
-            payload: { index: replaceIndex, page: data, param, headers },
+            payload: { index: existingIndex, page: data, param, headers },
           });
         } else {
           dispatch({
@@ -245,110 +244,22 @@ export const useNexusInfiniteQuery = <
         dispatch({ type: 'END_FETCH', payload: { mode } });
       }
     },
-    [getDefinition, keepPages, makeCacheKey, pathname, route]
+    [getDefinition, keepPages, makeCacheKey, pathname, route, state.data]
   );
-  const getDefaultMode = useCallback((): QueryRefetchMode => {
-    const cacheKey = makeCacheKey(rawPageParams[rawPageParams.length - 1]);
-    const cachedEntry = clientCacheStore.get<TPage>(cacheKey);
 
-    if (!cachedEntry) {
-      return 'foreground';
-    }
-
-    const isExpired = isCacheEntryExpired(cachedEntry);
-
-    const modeByKeepStaleData = keepStaleData ? 'background' : 'foreground';
-
-    return isExpired ? modeByKeepStaleData : 'background';
-  }, [makeCacheKey, rawPageParams, keepStaleData]);
-
-  const materializePage = useCallback(
-    async (
-      param: TParam,
-      mode?: QueryRefetchMode,
-      replaceIndex?: number,
-      force?: boolean
-    ) => {
+  const getDefaultMode = useCallback(
+    (param: TParam): QueryRefetchMode => {
       const cacheKey = makeCacheKey(param);
       const cachedEntry = clientCacheStore.get<TPage>(cacheKey);
-      const defaultMode = getDefaultMode();
 
-      if (cachedEntry) {
-        const expired = isCacheEntryExpired(cachedEntry);
-        const shouldDisplay = !expired || keepStaleData;
+      if (!cachedEntry) return 'foreground';
 
-        if (shouldDisplay) {
-          const headers = new Headers(cachedEntry.headers || {});
+      const isExpired = isCacheEntryExpired(cachedEntry);
+      const modeByKeepStaleData = keepStaleData ? 'background' : 'foreground';
 
-          if (typeof replaceIndex === 'number') {
-            dispatch({
-              type: 'REPLACE',
-              payload: {
-                index: replaceIndex,
-                page: cachedEntry.data,
-                param,
-                headers,
-              },
-            });
-          } else {
-            dispatch({
-              type: 'APPEND',
-              payload: { page: cachedEntry.data, param, headers, keepPages },
-            });
-          }
-        }
-
-        if (!enabled) return;
-
-        const finalMode: QueryRefetchMode = mode ?? defaultMode;
-
-        if (force || expired) {
-          await runFetch(param, finalMode, replaceIndex);
-        }
-        return;
-      }
-
-      if (!enabled) return;
-
-      const finalMode: QueryRefetchMode = mode ?? defaultMode;
-
-      await runFetch(param, finalMode, replaceIndex);
+      return isExpired ? modeByKeepStaleData : 'background';
     },
-    [enabled, keepPages, keepStaleData, makeCacheKey, runFetch, getDefaultMode]
-  );
-
-  const revalidateNext = useCallback(async (): Promise<void> => {
-    const isFirst = rawPages.length === 0;
-    const nextParam = isFirst
-      ? initialPageParam
-      : getNextPageParam(rawPages[rawPages.length - 1], rawPages);
-
-    if (nextParam == null) return;
-
-    const cacheKey = makeCacheKey(nextParam);
-    const cachedEntry = clientCacheStore.get<TPage>(cacheKey);
-    const mode: QueryRefetchMode = cachedEntry ? 'background' : 'foreground';
-
-    await materializePage(nextParam, mode, undefined, false);
-  }, [
-    getNextPageParam,
-    initialPageParam,
-    makeCacheKey,
-    materializePage,
-    rawPages,
-  ]);
-
-  const refetchNext = useCallback(
-    async (mode?: QueryRefetchMode): Promise<void> => {
-      const isFirst = rawPages.length === 0;
-      const nextParam = isFirst
-        ? initialPageParam
-        : getNextPageParam(rawPages[rawPages.length - 1], rawPages);
-      if (nextParam == null) return;
-      const finalMode: QueryRefetchMode = mode ?? 'foreground';
-      await materializePage(nextParam, finalMode, undefined, true);
-    },
-    [getNextPageParam, initialPageParam, materializePage, rawPages]
+    [keepStaleData, makeCacheKey]
   );
 
   const syncStateWithCache = useCallback((): ClientCacheEntry<TPage> | null => {
@@ -387,21 +298,73 @@ export const useNexusInfiniteQuery = <
     (shouldRevalidate: boolean): void => {
       const cachedEntry = syncStateWithCache();
 
-      if (!enabled) return;
+      if (!enabled || rawPages.length !== 0) return;
 
-      if (rawPages.length !== 0) return;
+      const defaultMode = getDefaultMode(initialPageParam);
 
       if (!cachedEntry) {
-        void runFetch(initialPageParam, 'foreground');
+        void runFetch(initialPageParam, defaultMode);
+
         return;
       }
 
-      if (shouldRevalidate) {
-        void runFetch(initialPageParam, 'background', 0);
+      if (shouldRevalidate && isCacheEntryExpired(cachedEntry)) {
+        void runFetch(initialPageParam, defaultMode);
       }
     },
-    [enabled, initialPageParam, runFetch, syncStateWithCache, rawPages.length]
+    [
+      enabled,
+      initialPageParam,
+      runFetch,
+      syncStateWithCache,
+      rawPages.length,
+      getDefaultMode,
+    ]
   );
+
+  const revalidatePage = useCallback(
+    async (param: TParam): Promise<void> => {
+      const cacheKey = makeCacheKey(param);
+      const cachedEntry = clientCacheStore.getWithTracking<TPage>(cacheKey);
+      const defaultMode = getDefaultMode(param);
+
+      if (!cachedEntry) {
+        void runFetch(param, defaultMode);
+
+        return;
+      }
+
+      const isExpired = isCacheEntryExpired(cachedEntry);
+
+      if (!isExpired || keepStaleData) {
+        dispatch({
+          type: 'APPEND',
+          payload: {
+            page: cachedEntry.data,
+            param,
+            headers: new Headers(cachedEntry.headers || {}),
+            keepPages,
+          },
+        });
+      }
+
+      if (!isExpired) return;
+
+      await runFetch(param, defaultMode);
+    },
+    [keepPages, keepStaleData, makeCacheKey, runFetch, getDefaultMode]
+  );
+
+  const revalidateNext = useCallback(async (): Promise<void> => {
+    const isFirst = rawPages.length === 0;
+    const nextParam = isFirst
+      ? initialPageParam
+      : getNextPageParam(rawPages[rawPages.length - 1], rawPages);
+
+    if (nextParam == null) return;
+
+    await revalidatePage(nextParam);
+  }, [getNextPageParam, initialPageParam, revalidatePage, rawPages]);
 
   useQueryOnMount(() => initializeQuery(revalidateOnMount));
 
@@ -419,10 +382,6 @@ export const useNexusInfiniteQuery = <
 
     const rootMargin = cfg.rootMargin;
     const threshold = cfg.threshold;
-    const strategy = cfg.strategy ?? 'revalidate';
-    const defaultMode: QueryRefetchMode =
-      strategy === 'revalidate' ? 'background' : 'foreground';
-    const mode: QueryRefetchMode = cfg.mode ?? defaultMode;
 
     if (observerRef.current) {
       observerRef.current.disconnect();
@@ -436,11 +395,7 @@ export const useNexusInfiniteQuery = <
       entries => {
         const entry = entries[0];
         if (!entry || !entry.isIntersecting) return;
-        if (strategy === 'revalidate') {
-          void revalidateNext();
-        } else {
-          void refetchNext(mode);
-        }
+        void revalidateNext();
       },
       { root: null, rootMargin, threshold }
     );
@@ -452,13 +407,7 @@ export const useNexusInfiniteQuery = <
       observer.disconnect();
       observerRef.current = null;
     };
-  }, [
-    enabled,
-    hasNextPage,
-    prefetchNextOnNearViewport,
-    revalidateNext,
-    refetchNext,
-  ]);
+  }, [enabled, hasNextPage, prefetchNextOnNearViewport, revalidateNext]);
 
   const selectedPages = useStableArraySelect<TPage, TSelected>(
     rawPages,
@@ -485,7 +434,6 @@ export const useNexusInfiniteQuery = <
     isError: state.isError,
     hasNextPage,
     revalidateNext,
-    refetchNext,
     prefetchRef: prefetchNextOnNearViewport ? prefetchRef : undefined,
   };
 };

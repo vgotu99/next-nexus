@@ -18,12 +18,11 @@ export interface UseNexusQueryResult<TSelectedData = unknown> {
   isSuccess: boolean;
   isError: boolean;
   revalidate: () => Promise<void>;
-  refetch: (mode?: QueryRefetchMode) => Promise<void>;
 }
 
 export type NexusQueryState<TSelectedData = unknown> = Omit<
   UseNexusQueryResult<TSelectedData>,
-  'refetch' | 'revalidate'
+  'revalidate'
 >;
 
 export type UseNexusInfiniteQueryOptions<
@@ -47,11 +46,10 @@ export type UseNexusInfiniteQueryResult<
   TParam = unknown,
 > = Omit<
   UseNexusQueryResult<{ pages: TSelected[]; pageParams: TParam[] }>,
-  'refetch' | 'revalidate'
+  'revalidate'
 > & {
   hasNextPage: boolean;
   revalidateNext: () => Promise<void>;
-  refetchNext: (mode?: QueryRefetchMode) => Promise<void>;
   prefetchRef?: (el: Element | null) => void;
 };
 

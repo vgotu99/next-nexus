@@ -111,6 +111,17 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
 
   const pathname = usePathname();
 
+  const getDefaultMode = useCallback((): QueryRefetchMode => {
+    const cachedEntry = clientCacheStore.get(cacheKey);
+
+    if (!cachedEntry) return 'foreground';
+
+    const isExpired = isCacheEntryExpired(cachedEntry);
+    const modeByKeepStaleData = keepStaleData ? 'background' : 'foreground';
+
+    return isExpired ? modeByKeepStaleData : 'background';
+  }, [cacheKey, keepStaleData]);
+
   const runFetch = useCallback(
     async (mode: QueryRefetchMode): Promise<void> => {
       dispatch({ type: 'START_FETCH', payload: { mode } });
@@ -138,12 +149,6 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     },
     [cacheKey, definition, pathname, route]
   );
-
-  const getModeByCachedEntry = useCallback((): QueryRefetchMode => {
-    const hasEntry = clientCacheStore.has(cacheKey);
-
-    return hasEntry ? 'background' : 'foreground';
-  }, [cacheKey]);
 
   const syncStateWithCache = useCallback((): ClientCacheEntry<TData> | null => {
     const cachedEntry = clientCacheStore.getWithTracking<TData>(cacheKey);
@@ -173,42 +178,41 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     return cachedEntry;
   }, [cacheKey, keepStaleData]);
 
-  const refetch = useCallback(
-    async (mode?: QueryRefetchMode): Promise<void> => {
-      const modeByCacheEntry = getModeByCachedEntry();
-      const finalMode = mode ?? modeByCacheEntry;
-
-      await runFetch(finalMode);
-    },
-    [runFetch, getModeByCachedEntry]
-  );
-
-  const revalidate = useCallback(async (): Promise<void> => {
-    const cachedEntry = clientCacheStore.get<TData>(cacheKey);
-
-    if (!cachedEntry) return;
-
-    if (!isCacheEntryExpired(cachedEntry)) return;
-
-    await runFetch('background');
-  }, [runFetch, cacheKey]);
-
   const initializeQuery = useCallback(
     (shouldRevalidate: boolean): void => {
       const cachedEntry = syncStateWithCache();
 
       if (!enabled) return;
 
+      const defaultMode = getDefaultMode();
+
       if (!cachedEntry) {
-        void runFetch('foreground');
+        void runFetch(defaultMode);
 
         return;
       }
 
-      if (shouldRevalidate) void runFetch('background');
+      if (shouldRevalidate && isCacheEntryExpired(cachedEntry)) {
+        void runFetch(defaultMode);
+      }
     },
-    [enabled, runFetch, syncStateWithCache]
+    [enabled, runFetch, syncStateWithCache, getDefaultMode]
   );
+
+  const revalidate = useCallback(async (): Promise<void> => {
+    const cachedEntry = clientCacheStore.get(cacheKey);
+    const defaultMode = getDefaultMode();
+
+    if (!cachedEntry) {
+      void runFetch(defaultMode);
+
+      return;
+    }
+
+    if (!isCacheEntryExpired(cachedEntry)) return;
+
+    await runFetch(defaultMode);
+  }, [cacheKey, getDefaultMode, runFetch]);
 
   useQueryOnMount(() => {
     initializeQuery(revalidateOnMount);
@@ -243,6 +247,5 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
     isSuccess: state.isSuccess,
     isError: state.isError,
     revalidate,
-    refetch,
   };
 };
