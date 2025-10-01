@@ -301,6 +301,10 @@ const getWithTracking = <T = unknown>(
   return entry;
 };
 
+const has = (key: string): boolean => {
+  return clientCacheState.clientCache.has(key);
+};
+
 const set = <T = unknown>(
   key: string,
   entry: Omit<ClientCacheEntry<T>, 'key' | 'createdAt' | 'expiresAt'>
@@ -422,6 +426,7 @@ const setMaxSize = (newSize: number): void => {
 export const clientCacheStore = {
   get,
   getWithTracking,
+  has,
   set,
   update,
   delete: deleteKey,

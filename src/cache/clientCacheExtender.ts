@@ -5,9 +5,9 @@ export const extendCacheEntryTTL = (
   cacheKey: string,
   extensionSeconds: number
 ): boolean => {
-  const entry = clientCacheStore.get(cacheKey);
+  const hasEntry = clientCacheStore.has(cacheKey);
 
-  if (!entry) {
+  if (!hasEntry) {
     return false;
   }
 
