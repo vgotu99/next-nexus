@@ -366,9 +366,15 @@ export const useNexusInfiniteQuery = <
     await revalidatePage(nextParam);
   }, [getNextPageParam, initialPageParam, revalidatePage, rawPages]);
 
-  useQueryOnMount(() => initializeQuery(revalidateOnMount));
+  useQueryOnMount(
+    () => initializeQuery(revalidateOnMount),
+    [initializeQuery, revalidateOnMount]
+  );
 
-  useQueryOnWindowFocus(() => initializeQuery(revalidateOnWindowFocus));
+  useQueryOnWindowFocus(
+    () => initializeQuery(revalidateOnWindowFocus),
+    [initializeQuery, revalidateOnWindowFocus]
+  );
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const prefetchElementRef = useRef<Element | null>(null);

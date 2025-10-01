@@ -216,11 +216,11 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
 
   useQueryOnMount(() => {
     initializeQuery(revalidateOnMount);
-  });
+  }, [initializeQuery, revalidateOnMount]);
 
   useQueryOnWindowFocus(() => {
     initializeQuery(revalidateOnWindowFocus);
-  });
+  }, [initializeQuery, revalidateOnWindowFocus]);
 
   useEffect(() => {
     const unsubscribe = clientCacheStore.subscribe(
