@@ -200,7 +200,7 @@ export const useNexusQuery = <TData = unknown, TSelectedData = TData>(
   );
 
   const revalidate = useCallback(async (): Promise<void> => {
-    const cachedEntry = clientCacheStore.get(cacheKey);
+    const cachedEntry = clientCacheStore.getWithTracking(cacheKey);
     const defaultMode = getDefaultMode();
 
     if (!cachedEntry) {
