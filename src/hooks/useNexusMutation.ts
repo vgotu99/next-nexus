@@ -67,14 +67,12 @@ export const useNexusMutation = <
   TContext = unknown,
   TError = Error,
   TData = unknown,
-  TVariables = unknown,
+  TParam = unknown,
 >(
-  mutationDefinitionFactory: (variables: TVariables) => NexusDefinition<TData>,
-  options: UseNexusMutationOptions<TContext, TError, TData, TVariables> = {}
-): UseNexusMutationResult<TData, TError, TVariables> => {
-  if (
-    !isMutationDefinition(mutationDefinitionFactory(undefined as TVariables))
-  ) {
+  mutationDefinition: (param: TParam) => NexusDefinition<TData>,
+  options: UseNexusMutationOptions<TContext, TError, TData, TParam> = {}
+): UseNexusMutationResult<TData, TError, TParam> => {
+  if (!isMutationDefinition(mutationDefinition(undefined as TParam))) {
     throw new Error(
       'useNexusMutation only accepts POST, PUT, PATCH, DELETE definitions'
     );
@@ -94,7 +92,7 @@ export const useNexusMutation = <
   const inFlightRef = useRef(false);
 
   const executeMutation = useCallback(
-    async (variables: TVariables): Promise<TData> => {
+    async (param: TParam): Promise<TData> => {
       if (inFlightRef.current) {
         throw new Error('Mutation is already in progress');
       }
@@ -103,7 +101,7 @@ export const useNexusMutation = <
 
       try {
         const context: TContext | undefined = onStart
-          ? await onStart(variables)
+          ? await onStart(param)
           : undefined;
 
         dispatch({ type: 'SET_PENDING' });
@@ -113,7 +111,7 @@ export const useNexusMutation = <
           error: TError | null;
         }> => {
           try {
-            const definition = mutationDefinitionFactory(variables);
+            const definition = mutationDefinition(param);
             const finalDefinition = route
               ? { ...definition, baseURL: '', endpoint: route }
               : definition;
@@ -127,7 +125,7 @@ export const useNexusMutation = <
             });
 
             if (onSuccess) {
-              await onSuccess(data, variables, context);
+              await onSuccess(data, param, context);
             }
 
             return { data, error: null };
@@ -138,7 +136,7 @@ export const useNexusMutation = <
             dispatch({ type: 'SET_ERROR', payload: typedError });
 
             if (onError) {
-              await onError(typedError, variables, context);
+              await onError(typedError, param, context);
             }
 
             return { data: undefined, error: typedError };
@@ -146,7 +144,7 @@ export const useNexusMutation = <
         })();
 
         if (onSettled) {
-          await onSettled(result.data, result.error, variables, context);
+          await onSettled(result.data, result.error, param, context);
         }
 
         if (result.error) {
@@ -157,19 +155,19 @@ export const useNexusMutation = <
         inFlightRef.current = false;
       }
     },
-    [route, onStart, onSuccess, onError, onSettled, mutationDefinitionFactory]
+    [route, onStart, onSuccess, onError, onSettled, mutationDefinition]
   );
 
   const mutate = useCallback(
-    (variables: TVariables): void => {
-      void executeMutation(variables).catch(() => {});
+    (param: TParam): void => {
+      void executeMutation(param).catch(() => {});
     },
     [executeMutation]
   );
 
   const mutateAsync = useCallback(
-    (variables: TVariables): Promise<TData> => {
-      return executeMutation(variables);
+    (param: TParam): Promise<TData> => {
+      return executeMutation(param);
     },
     [executeMutation]
   );
