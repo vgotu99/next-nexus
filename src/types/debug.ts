@@ -13,6 +13,7 @@ export interface DebugConfig {
 
 export type CacheEventType =
   | 'HIT'
+  | 'HIT-STALE'
   | 'MISS'
   | 'SKIP'
   | 'MATCH'
@@ -25,6 +26,7 @@ export type CacheSource =
   | 'client-fetch'
   | 'client-manual'
   | 'client-hydration'
+  | 'client'
   | 'server';
 
 export type RequestEventType = 'START' | 'SUCCESS' | 'ERROR' | 'TIMEOUT';
@@ -33,7 +35,7 @@ export interface CacheEvent {
   type: CacheEventType;
   key: string;
   timestamp: number;
-  source?: CacheSource;
+  source: CacheSource;
   duration?: number;
   status?: number;
   tags?: string[];

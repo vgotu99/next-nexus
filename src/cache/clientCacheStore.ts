@@ -3,6 +3,7 @@ import type { ClientCacheEntry, ClientCacheState } from '@/types/cache';
 import {
   createCacheEntry,
   getTTLFromExpiresAt,
+  isCacheEntryExpired,
   normalizeCacheTags,
 } from '@/utils/cacheUtils';
 import { isClientEnvironment } from '@/utils/environmentUtils';
@@ -278,6 +279,7 @@ const getWithTracking = <T = unknown>(
 
   if (!entry) {
     trackCache({
+      source: 'client',
       type: 'MISS',
       key,
       size: clientCacheState.clientCache.size,
@@ -285,6 +287,21 @@ const getWithTracking = <T = unknown>(
     });
 
     return null;
+  }
+
+  const isExpired = isCacheEntryExpired(entry);
+
+  if (isExpired) {
+    trackCache({
+      type: 'HIT-STALE',
+      key,
+      source: `client-${entry.source}`,
+      tags: entry.clientTags,
+      revalidate: entry.clientRevalidate,
+      ttl: getTTLFromExpiresAt(entry.expiresAt),
+      size: clientCacheState.clientCache.size,
+      maxSize: clientCacheState.maxSize,
+    });
   }
 
   trackCache({
