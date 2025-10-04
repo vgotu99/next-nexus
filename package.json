@@ -48,8 +48,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
-    "build": "tsup",
-    "build:prod": "tsup --minify",
+    "build": "tsup && node postbuild.mjs",
+    "build:prod": "tsup --minify && node postbuild.mjs",
     "prepublishOnly": "npm run lint:check && npm run test:ci && npm run typecheck && npm run build:prod"
   },
   "repository": {
