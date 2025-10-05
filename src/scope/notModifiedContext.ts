@@ -3,8 +3,6 @@ import { AsyncLocalStorage } from 'async_hooks';
 const notModifiedKeyStorage = new AsyncLocalStorage<Set<string>>();
 
 export const enterNotModifiedContext = (): void => {
-  // Only initialize once per async render context to avoid resetting
-  // previously registered keys when nested boundaries exist.
   if (!notModifiedKeyStorage.getStore()) {
     notModifiedKeyStorage.enterWith(new Set<string>());
   }

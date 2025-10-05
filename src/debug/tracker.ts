@@ -132,8 +132,6 @@ const publishRequestStart = ({ url, method }: PublishRequestStart): number => {
   return performance.now();
 };
 
-performance
-
 const publishRequestSuccess = ({
   url,
   method,
