@@ -72,7 +72,7 @@ export const useNexusMutation = <
   mutationDefinition: (param: TParam) => NexusDefinition<TData>,
   options: UseNexusMutationOptions<TContext, TError, TData, TParam> = {}
 ): UseNexusMutationResult<TData, TError, TParam> => {
-  if (!isMutationDefinition(mutationDefinition(undefined as TParam))) {
+  if (!isMutationDefinition(mutationDefinition({} as TParam))) {
     throw new Error(
       'useNexusMutation only accepts POST, PUT, PATCH, DELETE definitions'
     );
