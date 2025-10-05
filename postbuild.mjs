@@ -59,10 +59,7 @@ const cleanupDirectory = async dirPath => {
 const run = async () => {
   console.log('Running post-build script...');
   const distDir = path.resolve(process.cwd(), 'dist');
-  const entryPointPaths = [
-    path.join(distDir, 'client', 'index.js'),
-    path.join(distDir, 'internal-client', 'index.js'),
-  ];
+  const entryPointPaths = [path.join(distDir, 'internal-client', 'index.js')];
 
   try {
     const existingEntryPoints = (
@@ -85,7 +82,10 @@ const run = async () => {
 
     const chunks = await findDependentChunks(existingEntryPoints, distDir);
     await Promise.all([...chunks].map(addUseClientBanner));
-    await cleanupDirectory(path.join(distDir, 'internal-client'));
+    await Promise.all([
+      cleanupDirectory(path.join(distDir, 'internal-client')),
+      cleanupDirectory(path.join(distDir, 'internal')),
+    ]);
 
     console.log('Post-build script finished successfully.');
   } catch (error) {
