@@ -1,6 +1,7 @@
 'use client';
 
-import { NexusHydrator, NexusRscInitializer } from 'next-nexus/client';
+import { NexusHydrator } from '@/client/NexusHydrator';
+import { NexusRscInitializer } from '@/core/NexusRscInitializer';
 
 export const NexusRuntime = ({ maxSize }: { maxSize?: number }) => {
   return (

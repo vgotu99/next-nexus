@@ -1,6 +1,6 @@
 'use client';
 
-import { nexusCache } from '@/client';
+import { nexusCache } from '@/cache/nexusCache';
 import type {
   NexusRendererGroupProps,
   NexusRendererSingleProps,

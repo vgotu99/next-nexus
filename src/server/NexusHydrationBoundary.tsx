@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { Suspense } from 'react';
 
+import { NexusHydrationDispatcher } from '@/client/NexusHydrationDispatcher';
 import { COOKIES } from '@/constants/cache';
 import {
   enterNotModifiedContext,
@@ -15,7 +16,6 @@ import { requestScopeStore } from '@/scope/requestScopeStore';
 import type { ClientCacheEntry } from '@/types/cache';
 import type { NexusPayload } from '@/types/payload';
 import { logger } from '@/utils/logger';
-import { NexusHydrationDispatcher } from 'next-nexus/client';
 
 const collectHydrationData = async () => {
   const allCacheKeys = await requestScopeStore.keys();
@@ -74,7 +74,7 @@ const HydrationScript = async () => {
     );
   } catch (error) {
     logger.warn('[Provider] Failed to generate hydration script', error);
-    
+
     return null;
   }
 };

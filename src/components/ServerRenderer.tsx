@@ -2,7 +2,7 @@ import type {
   NexusRendererSingleProps,
   NexusRendererGroupProps,
 } from '@/components/NexusRenderer';
-import { nexus } from '@/server';
+import { nexus } from '@/core/nexus';
 import type { NexusDefinition } from '@/types/definition';
 
 export const SingleDefinitionServerRenderer = async <

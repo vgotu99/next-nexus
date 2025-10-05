@@ -5,21 +5,21 @@ import {
   findExactClientCacheMetadata,
 } from '@/cache/serverCacheStateProcessor';
 import {
+  SingleDefinitionClientRenderer,
+  GroupDefinitionsClientRenderer,
+} from '@/components/ClientRenderer';
+import {
   SingleDefinitionServerRenderer,
   GroupDefinitionsServerRenderer,
 } from '@/components/ServerRenderer';
+import { nexus } from '@/core/nexus';
 import {
   reservePending,
   releaseReservation,
 } from '@/scope/requestPendingStore';
-import { nexus } from '@/server';
 import type { NexusDefinition } from '@/types/definition';
 import { generateCacheKeyFromDefinition } from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
-import {
-  SingleDefinitionClientRenderer,
-  GroupDefinitionsClientRenderer,
-} from 'next-nexus/client';
 
 type ComponentSingleProps<
   D,
