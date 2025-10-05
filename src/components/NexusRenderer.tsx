@@ -20,6 +20,7 @@ import {
 import type { NexusDefinition } from '@/types/definition';
 import { generateCacheKeyFromDefinition } from '@/utils/cacheUtils';
 import { isGetDefinition } from '@/utils/definitionUtils';
+import { logger } from '@/utils/logger';
 
 type ComponentSingleProps<
   D,
@@ -150,7 +151,7 @@ const GroupDefinitionsRenderer = async <
     try {
       await Promise.all(staleGetDefinitions.map(def => nexus(def)));
     } catch (e) {
-      console.warn('[NexusRenderer] Prefetch failed', e);
+      logger.warn('[NexusRenderer] Prefetch failed', e);
     }
   }
 
