@@ -1,7 +1,10 @@
-import {
+import type {
+  InterceptorHandler,
+  NexusInterceptors,
   NexusRequestInterceptor,
   NexusResponseInterceptor,
 } from '@/types/interceptor';
+import type { InternalNexusResponse } from '@/types/internal';
 
 const createInterceptorManager = <T>() => {
   const interceptors: Map<string, T> = new Map();
@@ -35,7 +38,7 @@ const createInterceptorManager = <T>() => {
   };
 };
 
-export const createRequestInterceptor = () => {
+const createRequestInterceptor = () => {
   const manager = createInterceptorManager<NexusRequestInterceptor>();
 
   return {
@@ -43,14 +46,14 @@ export const createRequestInterceptor = () => {
     use: (
       name: string,
       onFulfilled: NexusRequestInterceptor['onFulfilled'],
-      onRejected?: NexusRequestInterceptor['onRejected'],
+      onRejected?: NexusRequestInterceptor['onRejected']
     ): void => {
       manager.use(name, { name, onFulfilled, onRejected });
     },
   };
 };
 
-export const createResponseInterceptor = () => {
+const createResponseInterceptor = () => {
   const manager = createInterceptorManager<NexusResponseInterceptor<unknown>>();
 
   return {
@@ -58,9 +61,41 @@ export const createResponseInterceptor = () => {
     use: (
       name: string,
       onFulfilled: NexusResponseInterceptor<unknown>['onFulfilled'],
-      onRejected?: NexusResponseInterceptor<unknown>['onRejected'],
+      onRejected?: NexusResponseInterceptor<unknown>['onRejected']
     ): void => {
       manager.use(name, { name, onFulfilled, onRejected });
     },
   };
 };
+
+const createInterceptorInterface = (
+  requestInterceptor: ReturnType<typeof createRequestInterceptor>,
+  responseInterceptor: ReturnType<typeof createResponseInterceptor>
+): NexusInterceptors => ({
+  request: {
+    use: (name, onFulfilled, onRejected?) =>
+      requestInterceptor.use(name, onFulfilled, onRejected),
+    remove: name => requestInterceptor.remove(name),
+    getAll: () => requestInterceptor.getAll(),
+    get: name => requestInterceptor.get(name),
+  },
+  response: {
+    use: (name, onFulfilled, onRejected?) =>
+      responseInterceptor.use(
+        name,
+        onFulfilled as InterceptorHandler<InternalNexusResponse<unknown>>,
+        onRejected
+      ),
+    remove: name => responseInterceptor.remove(name),
+    getAll: () => responseInterceptor.getAll(),
+    get: name => responseInterceptor.get(name),
+  },
+});
+
+export const globalRequestInterceptor = createRequestInterceptor();
+export const globalResponseInterceptor = createResponseInterceptor();
+
+export const interceptors: NexusInterceptors = createInterceptorInterface(
+  globalRequestInterceptor,
+  globalResponseInterceptor
+);

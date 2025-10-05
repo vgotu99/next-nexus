@@ -1,97 +1,34 @@
 import { ERROR_CODES } from '@/constants/errorCodes';
 import {
+  globalRequestInterceptor,
+  globalResponseInterceptor,
+} from '@/core/interceptor';
+import {
   trackRequestError,
   trackRequestStart,
   trackRequestSuccess,
   trackRequestTimeout,
 } from '@/debug/tracker';
 import { isNexusError } from '@/errors/errorFactory';
-import type { ServerCacheOptions } from '@/types/cache';
 import type { NexusDefinition } from '@/types/definition';
-import type {
-  InterceptorHandler,
-  NexusInterceptors,
-} from '@/types/interceptor';
 import type {
   InternalNexusRequestConfig,
   InternalNexusResponse,
-  NexusOptions,
 } from '@/types/internal';
 import type { NexusResponse } from '@/types/response';
 import {
   applyRequestInterceptors,
   applyResponseInterceptors,
 } from '@/utils/applyInterceptor';
-import { executeRequest } from '@/utils/executeRequest';
+import { executeRequest, buildRequestConfig } from '@/utils/executeRequest';
 import { retry } from '@/utils/retry';
-
-import {
-  createRequestInterceptor,
-  createResponseInterceptor,
-} from './interceptor';
-
-const transformServerOptionsToNextOptions = (
-  server?: ServerCacheOptions
-): NexusOptions | undefined => {
-  if (!server) return undefined;
-
-  const nextOptions: NexusOptions = {};
-  if (server.revalidate !== undefined) {
-    nextOptions.revalidate = server.revalidate;
-  }
-  if (server.tags?.length) {
-    nextOptions.tags = server.tags;
-  }
-
-  return Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
-};
-
-const buildRequestConfig = (
-  definition: NexusDefinition<unknown>
-): InternalNexusRequestConfig => {
-  const { data, server, ...restOptions } = definition;
-
-  const next = transformServerOptionsToNextOptions(server);
-
-  return {
-    ...restOptions,
-    cache: server?.cache ? server.cache : 'no-store',
-    next,
-    body: data ? JSON.stringify(data) : undefined,
-    server,
-  };
-};
-
-const createInterceptorInterface = (
-  requestInterceptor: ReturnType<typeof createRequestInterceptor>,
-  responseInterceptor: ReturnType<typeof createResponseInterceptor>
-): NexusInterceptors => ({
-  request: {
-    use: (name, onFulfilled, onRejected?) =>
-      requestInterceptor.use(name, onFulfilled, onRejected),
-    remove: name => requestInterceptor.remove(name),
-    getAll: () => requestInterceptor.getAll(),
-    get: name => requestInterceptor.get(name),
-  },
-  response: {
-    use: (name, onFulfilled, onRejected?) =>
-      responseInterceptor.use(
-        name,
-        onFulfilled as InterceptorHandler<InternalNexusResponse<unknown>>,
-        onRejected
-      ),
-    remove: name => responseInterceptor.remove(name),
-    getAll: () => responseInterceptor.getAll(),
-    get: name => responseInterceptor.get(name),
-  },
-});
 
 const executeRequestWithLifecycle = async <T>(
   url: string,
   config: InternalNexusRequestConfig,
   interceptors: string[],
-  requestInterceptor: ReturnType<typeof createRequestInterceptor>,
-  responseInterceptor: ReturnType<typeof createResponseInterceptor>
+  requestInterceptor: typeof globalRequestInterceptor,
+  responseInterceptor: typeof globalResponseInterceptor
 ): Promise<InternalNexusResponse<T | null | undefined>> => {
   const startTime = trackRequestStart({ url, method: config.method || 'GET' });
 
@@ -104,9 +41,12 @@ const executeRequestWithLifecycle = async <T>(
   try {
     const response = await retry({
       attempt: ({ signal }) => {
-        const attemptConfig = { ...modifiedConfig, signal };
-        const request = new Request(url, attemptConfig);
-        return executeRequest<T>(request);
+        const attemptConfig: InternalNexusRequestConfig = {
+          ...modifiedConfig,
+          signal,
+        };
+
+        return executeRequest<T>(url, attemptConfig);
       },
       maxAttempts: (modifiedConfig.retry?.count ?? 0) + 1,
       delaySeconds: modifiedConfig.retry?.delay ?? 1,
@@ -175,9 +115,6 @@ const executeRequestWithLifecycle = async <T>(
   }
 };
 
-const globalRequestInterceptor = createRequestInterceptor();
-const globalResponseInterceptor = createResponseInterceptor();
-
 export const nexusClient = async <T>(
   definition: NexusDefinition<T>
 ): Promise<NexusResponse<T>> => {
@@ -196,8 +133,3 @@ export const nexusClient = async <T>(
 
   return response as NexusResponse<T>;
 };
-
-export const interceptors: NexusInterceptors = createInterceptorInterface(
-  globalRequestInterceptor,
-  globalResponseInterceptor
-);
