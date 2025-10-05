@@ -2,7 +2,6 @@
 
 import { extendCacheEntryTTL } from '@/cache/clientCacheExtender';
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import type { NexusProviderProps } from '@/providers/NexusProvider';
 import type { NexusPayload } from '@/types/payload';
 import { isCacheEntryExpired } from '@/utils/cacheUtils';
 import { isDevelopment } from '@/utils/environmentUtils';
@@ -111,9 +110,7 @@ const setupHydratorOnce = (): void => {
   });
 };
 
-type ClientNexusProviderProps = Omit<NexusProviderProps, 'children'>;
-
-export const NexusHydrator = ({ maxSize }: ClientNexusProviderProps) => {
+export const NexusHydrator = ({ maxSize }: { maxSize?: number }) => {
   setupHydratorOnce();
 
   if (maxSize) {
