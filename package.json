@@ -1,6 +1,6 @@
 {
   "name": "next-nexus",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "The intelligent data layer for Next.js that simplifies your app with automatic caching, seamless hydration, and built-in cost savings.",
   "type": "module",
   "main": "dist/index.cjs",
