@@ -15,12 +15,11 @@ export const nexus = async () => {
 export const NexusRenderer = () => {
   throw serverOnlyError();
 };
+
 export const NexusHydrationBoundary = () => {
   throw serverOnlyError();
 };
+
 export const withNexusHydrationBoundary = () => {
-  throw serverOnlyError();
-};
-export const revalidateServerTags = () => {
   throw serverOnlyError();
 };
