@@ -72,7 +72,7 @@
   "bugs": {
     "url": "https://github.com/vgotu99/next-nexus/issues"
   },
-  "homepage": "https://github.com/vgotu99/next-nexus#readme",
+  "homepage": "https://next-nexus.vercel.app",
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^14.3.1",
