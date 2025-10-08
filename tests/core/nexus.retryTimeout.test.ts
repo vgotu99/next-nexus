@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { ERROR_CODES } from '@/constants/errorCodes';
-import { nexus } from '@/core/client';
+import { nexus } from '@/core/nexus';
 
 import { server } from '../setup';
 
@@ -69,11 +69,7 @@ describe('nexus - retry and timeout scenarios', () => {
 
   it('times out and exhausts retries, throwing TIMEOUT_ERROR', async () => {
     server.use(
-      http.get(
-        'http://localhost/api/slow',
-        () =>
-          new Promise(() => {}) as any
-      )
+      http.get('http://localhost/api/slow', () => new Promise(() => {}) as any)
     );
 
     await expect(

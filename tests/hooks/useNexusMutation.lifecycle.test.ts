@@ -1,7 +1,3 @@
-/**
- * @jest-environment jsdom
- */
-
 import { renderHook, act } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 

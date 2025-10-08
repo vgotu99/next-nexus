@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 
-import { interceptors, nexus } from '@/core/client';
+import { interceptors } from '@/core/interceptor';
+import { nexus } from '@/core/nexus';
 
 import { server } from '../setup';
 

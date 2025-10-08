@@ -21,7 +21,7 @@ describe('nexus logging error paths', () => {
           },
         }));
 
-        const { nexus } = require('@/core/client');
+        const { nexus } = require('@/core/nexus');
         await expect(
           nexus({
             method: 'GET',
@@ -57,7 +57,7 @@ describe('nexus logging error paths', () => {
           )
         );
 
-        const { nexus } = require('@/core/client');
+        const { nexus } = require('@/core/nexus');
         const res = await nexus({
           method: 'GET',
           baseURL: 'http://localhost',

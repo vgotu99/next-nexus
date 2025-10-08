@@ -15,12 +15,23 @@ jest.mock('@/utils/revalidateUtils', () => {
 });
 
 describe('revalidate utilities', () => {
-  it('revalidateClientTags delegates to clientCacheStore.revalidateByTags', () => {
+  it('revalidateClientTags gets keys by tags and invalidates each', () => {
     const store = require('@/cache/clientCacheStore');
-    const spy = jest.spyOn(store.clientCacheStore, 'revalidateByTags');
+    const getSpy = jest
+      .spyOn(store.clientCacheStore, 'getKeysByTags')
+      .mockReturnValue(['K1', 'K2']);
+    const invalidateSpy = jest
+      .spyOn(store.clientCacheStore, 'invalidate')
+      .mockImplementation(() => {});
 
     revalidateClientTags([' a ', 'b', 'a']);
-    expect(spy).toHaveBeenCalledWith([' a ', 'b', 'a']);
+
+    expect(getSpy).toHaveBeenCalledWith([' a ', 'b', 'a']);
+    expect(invalidateSpy).toHaveBeenCalledWith('K1');
+    expect(invalidateSpy).toHaveBeenCalledWith('K2');
+
+    getSpy.mockRestore();
+    invalidateSpy.mockRestore();
   });
 
   it('revalidateServerTags normalizes, validates, logs, and calls next/cache', async () => {

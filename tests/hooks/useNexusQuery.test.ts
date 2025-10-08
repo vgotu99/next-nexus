@@ -1,11 +1,8 @@
-/**
- * @jest-environment jsdom
- */
-
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
+import { nexusCache } from '@/cache/nexusCache';
 import { useNexusQuery } from '@/hooks/useNexusQuery';
 import {
   generateCacheKeyFromDefinition,
@@ -48,8 +45,8 @@ describe('useNexusQuery', () => {
 
     const { result } = renderHook(() =>
       useNexusQuery<any>(def as any, {
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
+        revalidateOnMount: false,
+        revalidateOnWindowFocus: false,
       })
     );
 
@@ -71,19 +68,43 @@ describe('useNexusQuery', () => {
     );
 
     await act(async () => {
-      await result.current.refetch();
+      await result.current.revalidate();
     });
 
-    expect(result.current.isSuccess).toBe(true);
-    expect(result.current.data).toEqual({
-      ok: true,
-      path: '/api/query-cache',
-      from: 'network',
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+
+      expect(result.current.data).toEqual({
+        ok: true,
+        path: '/api/query-cache',
+        from: 'cache',
+      });
+
+      const updated = clientCacheStore.get<any>(cacheKey);
+      expect(updated?.source).toBe('manual');
+      expect(updated?.headers?.etag).toBe(undefined);
     });
 
-    const updated = clientCacheStore.get<any>(cacheKey);
-    expect(updated?.source).toBe('fetch');
-    expect(updated?.headers?.etag).toBe('W/"net"');
+    const cache = nexusCache(def);
+    cache.invalidate();
+
+    await act(async () => {
+      await result.current.revalidate();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+
+      expect(result.current.data).toEqual({
+        ok: true,
+        path: '/api/query-cache',
+        from: 'network',
+      });
+
+      const updated = clientCacheStore.get<any>(cacheKey);
+      expect(updated?.source).toBe('fetch');
+      expect(updated?.headers?.etag).toBe('W/"net"');
+    });
   });
 
   it('fetches on mount when cache missing and writes ETag + cached headers into client cache', async () => {

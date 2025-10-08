@@ -1,11 +1,8 @@
-/**
- * @jest-environment jsdom
- */
-
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 
 import { clientCacheStore } from '@/cache/clientCacheStore';
+import { nexusCache } from '@/cache/nexusCache';
 import { useNexusQuery } from '@/hooks/useNexusQuery';
 import { generateCacheKeyFromDefinition } from '@/utils/cacheUtils';
 
@@ -49,8 +46,8 @@ describe('useNexusQuery - refetch on window focus', () => {
     const { result } = renderHook(() =>
       useNexusQuery<any>(def as any, {
         route: 'http://localhost/api/focus',
-        refetchOnMount: false,
-        refetchOnWindowFocus: true,
+        revalidateOnMount: false,
+        revalidateOnWindowFocus: true,
       })
     );
 
@@ -61,11 +58,23 @@ describe('useNexusQuery - refetch on window focus', () => {
       window.dispatchEvent(new Event('focus'));
     });
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual({ version: 2 });
+    await waitFor(() => {
+      const updated = clientCacheStore.get<any>(cacheKey);
+      expect(updated?.source).toBe('manual');
+      expect(updated?.headers?.etag).toBe(undefined);
+    });
 
-    const updated = clientCacheStore.get<any>(cacheKey);
-    expect(updated?.source).toBe('fetch');
-    expect(updated?.headers?.etag).toBe('W/"v2"');
+    const cache = nexusCache(def);
+    cache.invalidate();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    await waitFor(() => {
+      const updated = clientCacheStore.get<any>(cacheKey);
+      expect(updated?.source).toBe('fetch');
+      expect(updated?.headers?.etag).toBe('W/"v2"');
+    });
   });
 });

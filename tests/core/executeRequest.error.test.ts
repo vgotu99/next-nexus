@@ -13,9 +13,9 @@ describe('executeRequest - http error', () => {
       )
     );
 
-    const req = new Request('http://localhost/api/error');
+    const url = 'http://localhost/api/error';
 
-    await expect(executeRequest(req)).rejects.toMatchObject({
+    await expect(executeRequest(url, {} as any)).rejects.toMatchObject({
       name: 'NexusError',
       message: 'Resource not found',
       code: ERROR_CODES.NOT_FOUND_ERROR,
