@@ -2,10 +2,8 @@ import type { Config } from 'jest';
 
 const config: Config = {
   preset: 'ts-jest',
-  testEnvironment: 'node',
-  testMatch: [
-    '<rootDir>/tests/**/?(*.)+(spec|test).ts?(x)'
-  ],
+  testEnvironment: 'jsdom',
+  testMatch: ['<rootDir>/tests/**/?(*.)+(spec|test).ts?(x)'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
@@ -18,10 +16,9 @@ const config: Config = {
     'src/**/*.{ts,tsx}',
     '!src/tests/**',
     '!src/types/**',
-    '!src/client/index.ts',
     '!src/constants/errorMessages.ts',
     '!src/errors/NexusError.ts',
-    '!src/example.tsx',
+    '!src/entrypoints/**',
   ],
   coverageThreshold: {
     global: { lines: 90, statements: 90, functions: 90, branches: 75 },

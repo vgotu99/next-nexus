@@ -1,7 +1,3 @@
-/**
- * @jest-environment jsdom
- */
-
 jest.mock('react', () => {
   const actual = jest.requireActual('react');
   const has = typeof (actual as any).useActionState === 'function';

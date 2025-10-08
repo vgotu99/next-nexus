@@ -12,9 +12,12 @@ describe('executeRequest - success', () => {
       )
     );
 
-    const req = new Request('http://localhost/api/greet');
+    const url = 'http://localhost/api/greet';
 
-    const res = await executeRequest<{ ok: boolean; path: string }>(req);
+    const res = await executeRequest<{ ok: boolean; path: string }>(
+      url,
+      {} as any
+    );
 
     expect(res.ok).toBe(true);
     expect(res.status).toBe(200);

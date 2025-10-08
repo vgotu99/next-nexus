@@ -29,7 +29,7 @@ describe('clientCache (nexusCache + handler)', () => {
     warnSpy.mockRestore();
   });
 
-  it('provides handler to get/set/remove/invalidate/isStale/subscribe', () => {
+  it('provides handler to get/set/remove/invalidate/isStale/subscribe', async () => {
     const def = {
       method: 'GET' as const,
       baseURL: 'http://localhost',
@@ -55,6 +55,7 @@ describe('clientCache (nexusCache + handler)', () => {
     const unsubscribe = cache.subscribe(cb);
 
     cache.set(old => ({ count: (old?.count ?? 0) + 1 }));
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()));
     expect(clientCacheStore.get<any>(cacheKey)?.data).toEqual({ count: 2 });
     expect(clientCacheStore.get<any>(cacheKey)?.source).toBe('manual');
     expect(cb).toHaveBeenCalledWith({ count: 2 });
@@ -66,20 +67,23 @@ describe('clientCache (nexusCache + handler)', () => {
 
     unsubscribe();
     cache.set(() => ({ count: 3 }));
-    expect(cb).toHaveBeenCalledTimes(2);
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()));
+    expect(cb).toHaveBeenCalledTimes(1);
 
     cache.remove();
     expect(clientCacheStore.get<any>(cacheKey)).toBeNull();
   });
 
-  it('gracefully handles set/invalidate on missing entries', () => {
+  it('set throws when entry missing; invalidate on missing is a no-op', () => {
     const def = {
       method: 'GET' as const,
       baseURL: 'http://localhost',
       endpoint: '/api/missing',
     };
     const cache = nexusCache(def as any);
-    cache.set(() => ({ ok: true }) as any);
-    cache.invalidate();
+    expect(() => cache.set(() => ({ ok: true }) as any)).toThrow(
+      '[Cache] nexusCache: Cannot update entry that does not exist'
+    );
+    expect(() => cache.invalidate()).not.toThrow();
   });
 });

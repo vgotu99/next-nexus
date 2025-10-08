@@ -1,5 +1,5 @@
 import { clientCacheStore } from '@/cache/clientCacheStore';
-import { generateBaseKey, generateCacheKey } from '@/utils/cacheUtils';
+import { generateCacheKey } from '@/utils/cacheUtils';
 
 jest.mock('@/utils/environmentUtils', () => ({
   isClientEnvironment: () => true,
@@ -39,7 +39,10 @@ describe('clientCacheStore', () => {
   });
 
   afterEach(() => {
-    clientCacheStore.revalidateByTags(['tA', 'tB', 'tC', 'tX', 'tY', 'tZ']);
+    ['tA', 'tB', 'tC', 'tX', 'tY', 'tZ'].forEach(tag => {
+      const keys = clientCacheStore.getKeysByTags([tag]);
+      keys.forEach(key => clientCacheStore.delete(key));
+    });
   });
 
   it('evicts least-recently-used when capacity exceeded', () => {
@@ -75,32 +78,48 @@ describe('clientCacheStore', () => {
     clientCacheStore.setMaxSize(prev);
   });
 
-  it('indexes by tags and baseKey; revalidateByTags removes matching entries', () => {
-    const baseA = generateBaseKey({ url: urlA, method: 'GET' });
-
+  it('indexes by tags; getKeysByTags retrieves matching entries', () => {
     clientCacheStore.set(keyA, entry({ a: 1 }, ['tX', 'tA']));
     clientCacheStore.set(keyB, entry({ b: 1 }, ['tY']));
 
-    const baseSet = clientCacheStore.getCacheKeysFromBaseKey(baseA);
-    expect(baseSet?.has(keyA)).toBe(true);
+    const keysWithTagX = clientCacheStore.getKeysByTags(['tX']);
+    expect(keysWithTagX).toContain(keyA);
+    expect(keysWithTagX).not.toContain(keyB);
 
-    clientCacheStore.revalidateByTags(['tX']);
-    expect(clientCacheStore.get(keyA)).toBeNull();
-    expect(clientCacheStore.get(keyB)?.data).toEqual({ b: 1 });
+    const keysWithTagY = clientCacheStore.getKeysByTags(['tY']);
+    expect(keysWithTagY).toContain(keyB);
+    expect(keysWithTagY).not.toContain(keyA);
   });
 
-  it('subscribe notifies on set and delete and can unsubscribe', () => {
+  it('subscribe notifies on set and delete and can unsubscribe', async () => {
     const received: Array<unknown> = [];
     const unsubscribe = clientCacheStore.subscribe(keyA, e =>
       received.push(e ? e.data : null)
     );
 
     clientCacheStore.set(keyA, entry({ a: 1 }, ['tZ']));
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()));
+    expect(received).toEqual([{ a: 1 }]);
+
     clientCacheStore.delete(keyA);
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()));
+    expect(received).toEqual([{ a: 1 }, null]);
 
     unsubscribe();
     clientCacheStore.set(keyA, entry({ a: 2 }, ['tZ']));
+    await new Promise<void>(resolve => queueMicrotask(() => resolve()));
 
     expect(received).toEqual([{ a: 1 }, null]);
+  });
+
+  it('invalidate marks entry stale and source manual when present', () => {
+    clientCacheStore.set(keyA, entry({ a: 1 }, ['tA']));
+    const before = clientCacheStore.get<any>(keyA)!;
+    expect(before.source).toBe('manual');
+
+    clientCacheStore.invalidate(keyA);
+    const after = clientCacheStore.get<any>(keyA)!;
+    expect(after.expiresAt).toBe(0);
+    expect(after.source).toBe('manual');
   });
 });

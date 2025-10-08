@@ -1,44 +1,27 @@
-import { clientCacheStore } from '@/cache/clientCacheStore';
-import { nexus } from '@/core/client';
-import { generateCacheKeyFromDefinition } from '@/utils/cacheUtils';
+import { http, HttpResponse } from 'msw';
 
-jest.mock('@/utils/environmentUtils', () => ({
-  isClientEnvironment: () => true,
-  isServerEnvironment: () => false,
-  isDevelopment: () => false,
-}));
+import { nexus } from '@/core/nexus';
 
-describe('nexus - client cache hit', () => {
-  it('returns CLIENT_HIT response from client cache and supports clone()', async () => {
-    const def = {
-      method: 'GET' as const,
+import { server } from '../setup';
+
+describe('nexus - basic GET (client cache behavior not supported here)', () => {
+  it('returns data from MSW handler', async () => {
+    server.use(
+      http.get('http://localhost/api/hello', () =>
+        HttpResponse.json({ ok: true, path: '/api/hello' }, { status: 200 })
+      )
+    );
+
+    const res = await nexus<{ ok: boolean; path: string }>({
+      method: 'GET',
       baseURL: 'http://localhost',
       endpoint: '/api/hello',
       interceptors: [],
-      client: { revalidate: 60, tags: ['t1'] },
-    };
+    } as const);
 
-    const cacheKey = generateCacheKeyFromDefinition(def);
-
-    clientCacheStore.set(cacheKey, {
-      data: { ok: true, path: '/api/hello' },
-      clientRevalidate: 60,
-      clientTags: ['t1'],
-      serverTags: [],
-      etag: undefined,
-      headers: undefined,
-      source: 'manual',
-    });
-
-    const res = await nexus<
-      typeof def extends { _phantomResponse: infer R }
-        ? R
-        : { ok: boolean; path: string }
-    >(def as any);
-
-    expect(res.headers.get('x-nexus-cache-status')).toBe('CLIENT_HIT');
+    expect(res.ok).toBe(true);
+    expect(res.status).toBe(200);
     expect(res.data).toEqual({ ok: true, path: '/api/hello' });
-
     const cloned = res.clone();
     expect(cloned.data).toEqual({ ok: true, path: '/api/hello' });
   });

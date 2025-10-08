@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
-import { nexus } from '@/core/client';
+import { nexus } from '@/core/nexus';
 
 import { server } from '../setup';
 
