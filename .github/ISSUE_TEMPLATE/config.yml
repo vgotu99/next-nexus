@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/next-nexus-org/next-nexus/discussions/new?category=q-a
+    about: Ask a question about next-nexus or get support.
+  - name: Report a security vulnerability
+    url: https://github.com/next-nexus-org/next-nexus/security/policy
+    about: Learn how to notify us of a security issue.

@@ -48,11 +48,44 @@
     "typecheck": "tsc --noEmit",
     "build": "tsup && node postbuild.mjs",
     "build:prod": "tsup --minify && node postbuild.mjs",
-    "prepublishOnly": "npm run lint:check && npm run test:ci && npm run typecheck && npm run build:prod"
+    "prepublishOnly": "npm run lint:check && npm run test:ci && npm run typecheck && npm run build:prod",
+    "postinstall": "npx lefthook install"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": "prettier --write"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ],
+    "rules": {
+      "body-leading-blank": [
+        1,
+        "always"
+      ],
+      "type-enum": [
+        2,
+        "always",
+        [
+          "feat",
+          "fix",
+          "docs",
+          "style",
+          "refactor",
+          "test",
+          "chore",
+          "revert"
+        ]
+      ]
+    }
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vgotu99/next-nexus.git"
+    "url": "git+https://github.com/next-nexus-org/next-nexus.git"
   },
   "author": "vgotu99",
   "license": "MIT",
@@ -70,10 +103,12 @@
     "cost-saving"
   ],
   "bugs": {
-    "url": "https://github.com/vgotu99/next-nexus/issues"
+    "url": "https://github.com/next-nexus-org/next-nexus/issues"
   },
   "homepage": "https://next-nexus.vercel.app",
   "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^14.3.1",
     "@types/jest": "^29.5.12",
@@ -83,6 +118,7 @@
     "@types/react-dom": "^19.1.6",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "esbuild-plugin-tsconfig-paths": "^1.0.1",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -91,16 +127,17 @@
     "eslint-plugin-react-hooks": "^4.6.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "lefthook": "^1.13.6",
+    "lint-staged": "^16.2.3",
     "msw": "^2.10.5",
     "prettier": "^3.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5",
-    "whatwg-fetch": "^3.6.20",
     "tsup": "^8.1.0",
-    "esbuild-plugin-tsconfig-paths": "^1.0.1"
+    "typescript": "^5.4.5",
+    "whatwg-fetch": "^3.6.20"
   },
   "peerDependencies": {
     "next": ">=14.0.0",
