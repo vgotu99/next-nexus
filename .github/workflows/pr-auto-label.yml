@@ -1,4 +1,4 @@
-name: PR Housekeeping
+name: PR Auto Label
 
 on:
   pull_request:
