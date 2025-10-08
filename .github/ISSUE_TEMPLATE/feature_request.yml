@@ -1,0 +1,46 @@
+name: ✨ Feature Request
+description: Propose a new feature or enhancement
+title: '[✨ Feature]: '
+labels: ['type: feature', 'status: triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this feature request!
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Please describe the problem or use case this feature would solve. Why is this feature important?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Please describe the new feature and how it would work.
+    validations:
+      required: true
+
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed API (Optional)
+      description: A code snippet that demonstrates how the new feature would be used.
+      render: tsx
+      placeholder: |
+        // Your code here
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Have you considered any alternative solutions or approaches?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or links that might be helpful.
